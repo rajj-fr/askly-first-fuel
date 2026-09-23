@@ -3,12 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   Sparkles, 
   Copy, 
-  Download, 
   Trash2, 
   Instagram,
-  Image as ImageIcon,
-  ExternalLink,
-  Upload
+  Image as ImageIcon
 } from 'lucide-react';
 
 // SUPABASE CONFIGURATION
@@ -240,7 +237,6 @@ function CreateQuestionPage({ onCreated, showToast }) {
         <h2 className="text-2xl font-bold mb-4">Create New Ask</h2>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Type question..." className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-white h-32 mb-4" />
         
-        {/* Optional Image Upload for Owner */}
         <div className="mb-6">
           <label className="text-xs font-semibold text-gray-400 block mb-2">Attach Image/Photo (Optional)</label>
           <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} className="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600/20 file:text-purple-300 hover:file:bg-purple-600/40" />
@@ -303,6 +299,7 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
   );
 }
 
+// STORY CARD GENERATOR WITH ASYNC IMAGE SUPPORT
 function StoryCardGenerator({ question, showToast, onBack }) {
   const canvasRef = useRef(null);
   const [imgUrl, setImgUrl] = useState('');
@@ -314,31 +311,66 @@ function StoryCardGenerator({ question, showToast, onBack }) {
     const ctx = canvas.getContext('2d');
     canvas.width = 1080; canvas.height = 1920;
     
-    ctx.fillStyle = '#FFE5EC';
-    ctx.fillRect(0, 0, 1080, 1920);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.roundRect(120, 620, 840, 580, 48);
-    ctx.fill();
+    const drawCard = (qImg = null) => {
+      ctx.fillStyle = '#FFE5EC';
+      ctx.fillRect(0, 0, 1080, 1920);
 
-    ctx.fillStyle = '#FF80A0';
-    ctx.font = 'bold 38px Inter';
-    ctx.textAlign = 'center';
-    ctx.fillText('ASKLY', 540, 730);
+      const boxY = qImg ? 450 : 620;
+      const boxHeight = qImg ? 950 : 580;
 
-    ctx.fillStyle = '#590D22';
-    ctx.font = 'bold 50px Inter';
-    ctx.fillText(question.text, 540, 900);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.roundRect(120, boxY, 840, boxHeight, 48);
+      ctx.fill();
 
-    canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
+      ctx.fillStyle = '#FF80A0';
+      ctx.font = 'bold 38px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('ASKLY', 540, boxY + 90);
+
+      if (qImg) {
+        ctx.drawImage(qImg, 240, boxY + 140, 600, 400);
+      }
+
+      ctx.fillStyle = '#590D22';
+      ctx.font = 'bold 48px Inter, sans-serif';
+
+      const textY = qImg ? boxY + 620 : boxY + 260;
+      const words = question.text.split(' ');
+      let line = '';
+      let curY = textY;
+      for (let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        if (ctx.measureText(testLine).width > 720 && n > 0) {
+          ctx.fillText(line, 540, curY);
+          line = words[n] + ' ';
+          curY += 60;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, 540, curY);
+
+      canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
+    };
+
+    if (question.image_url) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = question.image_url;
+      img.onload = () => drawCard(img);
+      img.onerror = () => drawCard(null);
+    } else {
+      drawCard(null);
+    }
   }, [question]);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
-      <button onClick={onBack} className="text-xs text-gray-400 mb-6">← Back</button>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <button onClick={onBack} className="text-xs text-gray-400 mb-6 block">← Back to Dashboard</button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
         <div className="flex flex-col items-center">
           <canvas ref={canvasRef} className="hidden" />
-          {imgUrl && <img src={imgUrl} className="w-64 h-[450px] rounded-3xl object-cover shadow-2xl" />}
+          {imgUrl && <img src={imgUrl} className="w-64 h-[450px] rounded-3xl object-cover shadow-2xl border border-white/10" />}
         </div>
         <div className="space-y-4">
           <button onClick={() => { navigator.clipboard.writeText(currentUrl); showToast("Link Copied!"); }} className="w-full bg-amber-500 text-black font-bold py-3 rounded-2xl">1. Copy Link</button>
@@ -349,7 +381,7 @@ function StoryCardGenerator({ question, showToast, onBack }) {
   );
 }
 
-// FIXED ANSWER STORY CARD GENERATOR (CLEAR QUESTION + ANSWER + OPTIONAL MEDIA)
+// PERFECTED ANSWER STORY CARD GENERATOR WITH BOTH QUESTION & ANSWER (PLUS ASYNC IMAGES)
 function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
   const canvasRef = useRef(null);
   const [imgUrl, setImgUrl] = useState('');
@@ -377,46 +409,66 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
     const ctx = canvas.getContext('2d');
     canvas.width = 1080; canvas.height = 1920;
 
-    // Background Gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
-    gradient.addColorStop(0, '#1E1B4B');
-    gradient.addColorStop(1, '#0F172A');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 1080, 1920);
+    const drawAnswerCard = (aImg = null) => {
+      // 1. Background Gradient
+      const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
+      gradient.addColorStop(0, '#1E1B4B');
+      gradient.addColorStop(1, '#0F172A');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1080, 1920);
 
-    // 1. QUESTION BOX (TOP)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.roundRect(100, 320, 880, 360, 40);
-    ctx.fill();
+      // 2. QUESTION BOX (TOP)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.roundRect(100, 300, 880, 320, 40);
+      ctx.fill();
 
-    ctx.fillStyle = '#C084FC';
-    ctx.font = 'bold 30px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('QUESTION', 540, 390);
+      ctx.fillStyle = '#C084FC';
+      ctx.font = 'bold 28px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('QUESTION', 540, 360);
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 38px Inter, sans-serif';
-    renderWrappedText(ctx, `"${question.text}"`, 540, 470, 780, 50);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 36px Inter, sans-serif';
+      renderWrappedText(ctx, `"${question.text}"`, 540, 430, 780, 48);
 
-    // 2. ANSWER BOX (BOTTOM)
-    ctx.fillStyle = '#FFFFFF';
-    ctx.roundRect(100, 740, 880, 680, 48);
-    ctx.fill();
+      // 3. ANSWER BOX (BOTTOM)
+      const answerBoxY = 680;
+      const answerBoxHeight = aImg ? 900 : 580;
 
-    ctx.fillStyle = '#DB2777';
-    ctx.font = 'bold 32px Inter, sans-serif';
-    ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, 830);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.roundRect(100, answerBoxY, 880, answerBoxHeight, 48);
+      ctx.fill();
 
-    ctx.fillStyle = '#111827';
-    ctx.font = 'bold 44px Inter, sans-serif';
-    renderWrappedText(ctx, `"${answer.text}"`, 540, 930, 780, 58);
+      ctx.fillStyle = '#DB2777';
+      ctx.font = 'bold 30px Inter, sans-serif';
+      ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, answerBoxY + 70);
 
-    // Watermark
-    ctx.fillStyle = '#9CA3AF';
-    ctx.font = 'bold 28px Inter, sans-serif';
-    ctx.fillText('ASKLY BY FIRST FUEL', 540, 1800);
+      if (aImg) {
+        ctx.drawImage(aImg, 240, answerBoxY + 110, 600, 380);
+      }
 
-    canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
+      ctx.fillStyle = '#111827';
+      ctx.font = 'bold 42px Inter, sans-serif';
+      const ansTextY = aImg ? answerBoxY + 550 : answerBoxY + 180;
+      renderWrappedText(ctx, `"${answer.text}"`, 540, ansTextY, 780, 54);
+
+      // Watermark
+      ctx.fillStyle = '#9CA3AF';
+      ctx.font = 'bold 28px Inter, sans-serif';
+      ctx.fillText('ASKLY BY FIRST FUEL', 540, 1800);
+
+      canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
+    };
+
+    if (answer.image_url) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = answer.image_url;
+      img.onload = () => drawAnswerCard(img);
+      img.onerror = () => drawAnswerCard(null);
+    } else {
+      drawAnswerCard(null);
+    }
   }, [question, answer]);
 
   return (
@@ -443,7 +495,6 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
   );
 }
 
-// PUBLIC ANSWER PAGE (MANDATORY USERNAME & OPTIONAL FILE ATTACHMENT)
 function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }) {
   const [text, setText] = useState('');
   const [author, setAuthor] = useState('');
@@ -481,8 +532,6 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }
           </div>
         ) : (
           <div className="space-y-4">
-            
-            {/* COMPULSORY USERNAME FIELD */}
             <div>
               <input 
                 type="text" 
@@ -501,7 +550,6 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }
               className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white h-32" 
             />
 
-            {/* OPTIONAL IMAGE UPLOAD BY VIEWER */}
             <div className="text-left">
               <label className="text-[11px] font-semibold text-gray-400 block mb-1">Attach a photo with answer (Optional)</label>
               <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} className="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600/20 file:text-purple-300 hover:file:bg-purple-600/40" />
