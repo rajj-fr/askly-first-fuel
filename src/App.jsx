@@ -8,16 +8,29 @@ import {
   Instagram
 } from 'lucide-react';
 
-// SUPABASE CONFIGURATION (Apni keys yahan replace karein)
+// SUPABASE CONFIGURATION
 const SUPABASE_URL = "https://grpbhwguqledavbnvfdq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE";
+const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE"; // 👈 Apni anon key re-paste karein
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home');
+  // ROUTING FIX ON REFRESH: Tab state read from URL hash or fallback to 'home'
+  const [activeTab, setActiveTabState] = useState(() => {
+    const hash = window.location.hash.replace('#', '');
+    return ['home', 'create', 'dashboard', 'story', 'public'].includes(hash) ? hash : 'home';
+  });
+
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [questions, setQuestions] = useState([]);
+
+  // Helper to change tab & sync with browser URL Hash
+  const setActiveTab = (tabName) => {
+    setActiveTabState(tabName);
+    if (tabName !== 'public') {
+      window.location.hash = tabName;
+    }
+  };
 
   // Fetch Questions & Answers from Supabase
   const loadData = async () => {
@@ -47,7 +60,7 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // URL Routing
+  // URL Query Parameter Routing Fix for IG Story Viewers (`?q=slug`)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const qSlug = params.get('q');
@@ -56,10 +69,10 @@ export default function App() {
       supabase.from('questions').select('*').eq('slug', qSlug).single().then(({ data }) => {
         if (data) {
           setSelectedQuestion(data);
-          setActiveTab('public');
+          setActiveTabState('public');
         } else {
           setSelectedQuestion({ slug: qSlug, text: "Answer this question! 👀" });
-          setActiveTab('public');
+          setActiveTabState('public');
         }
       });
     }
@@ -102,7 +115,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* MAIN CONTENT */}
+      {/* MAIN CONTENT ROUTER */}
       <main className="flex-grow">
         {activeTab === 'home' && <LandingPage onStart={() => setActiveTab('create')} />}
         
@@ -190,29 +203,33 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onDeleteQuestion })
     <div className="max-w-4xl mx-auto px-6 py-12">
       <h1 className="text-2xl font-black mb-6">Realtime Answers Dashboard</h1>
       <div className="space-y-6">
-        {questions.map(q => (
-          <div key={q.id} className="bg-white/5 border border-white/10 p-6 rounded-3xl">
-            <div className="flex justify-between items-center pb-4 border-b border-white/10">
-              <h3 className="font-bold text-lg">"{q.text}"</h3>
-              <div className="flex gap-2">
-                <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}?q=${q.slug}`); showToast("Link Copied!"); }} className="bg-amber-500/20 text-amber-300 px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Copy className="w-3.5 h-3.5"/> Copy Link</button>
-                <button onClick={() => onOpenStory(q)} className="bg-purple-600 text-white px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Instagram className="w-3.5 h-3.5"/> Story Card</button>
-                <button onClick={() => onDeleteQuestion(q.slug)} className="bg-red-500/20 text-red-400 p-2 rounded-xl text-xs"><Trash2 className="w-3.5 h-3.5"/></button>
+        {questions.length === 0 ? (
+          <p className="text-gray-400 text-center py-8">No questions created yet. Click "Create" to start!</p>
+        ) : (
+          questions.map(q => (
+            <div key={q.id} className="bg-white/5 border border-white/10 p-6 rounded-3xl">
+              <div className="flex justify-between items-center pb-4 border-b border-white/10">
+                <h3 className="font-bold text-lg">"{q.text}"</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}?q=${q.slug}`); showToast("Link Copied!"); }} className="bg-amber-500/20 text-amber-300 px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Copy className="w-3.5 h-3.5"/> Copy Link</button>
+                  <button onClick={() => onOpenStory(q)} className="bg-purple-600 text-white px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Instagram className="w-3.5 h-3.5"/> Story Card</button>
+                  <button onClick={() => onDeleteQuestion(q.slug)} className="bg-red-500/20 text-red-400 p-2 rounded-xl text-xs"><Trash2 className="w-3.5 h-3.5"/></button>
+                </div>
+              </div>
+              <div className="mt-4">
+                <span className="text-xs text-gray-400 block mb-2">Realtime Answers ({q.answers?.length || 0})</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {q.answers?.map(a => (
+                    <div key={a.id} className="bg-black/40 border border-white/10 p-3 rounded-2xl">
+                      <span className="text-xs font-bold text-pink-400 block mb-1">{a.author}</span>
+                      <p className="text-xs text-gray-200">{a.text}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="mt-4">
-              <span className="text-xs text-gray-400 block mb-2">Realtime Answers ({q.answers?.length || 0})</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {q.answers?.map(a => (
-                  <div key={a.id} className="bg-black/40 border border-white/10 p-3 rounded-2xl">
-                    <span className="text-xs font-bold text-pink-400 block mb-1">{a.author}</span>
-                    <p className="text-xs text-gray-200">{a.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
