@@ -5,7 +5,10 @@ import {
   Copy, 
   Download, 
   Trash2, 
-  Instagram
+  Instagram,
+  Image as ImageIcon,
+  ExternalLink,
+  Upload
 } from 'lucide-react';
 
 // SUPABASE CONFIGURATION
@@ -117,9 +120,21 @@ export default function App() {
         
         {activeTab === 'create' && (
           <CreateQuestionPage 
-            onCreated={async (qText) => {
+            showToast={showToast}
+            onCreated={async (qText, file) => {
+              let imageUrl = null;
+              if (file) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `q_${Date.now()}.${fileExt}`;
+                const { data: uploadData } = await supabase.storage.from('askly-media').upload(fileName, file);
+                if (uploadData) {
+                  const { data: publicUrlData } = supabase.storage.from('askly-media').getPublicUrl(fileName);
+                  imageUrl = publicUrlData.publicUrl;
+                }
+              }
+
               const slug = Math.random().toString(36).substring(2, 8);
-              const { data } = await supabase.from('questions').insert([{ slug, text: qText }]).select().single();
+              const { data } = await supabase.from('questions').insert([{ slug, text: qText, image_url: imageUrl }]).select().single();
               if (data) {
                 showToast("Question Live! 🎉");
                 setSelectedQuestion(data);
@@ -166,11 +181,23 @@ export default function App() {
             question={selectedQuestion} 
             showToast={showToast}
             onCreateOwn={() => setActiveTab('create')}
-            onAnswerSubmit={async (text, author) => {
+            onAnswerSubmit={async (text, author, file) => {
+              let imageUrl = null;
+              if (file) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `a_${Date.now()}.${fileExt}`;
+                const { data: uploadData } = await supabase.storage.from('askly-media').upload(fileName, file);
+                if (uploadData) {
+                  const { data: publicUrlData } = supabase.storage.from('askly-media').getPublicUrl(fileName);
+                  imageUrl = publicUrlData.publicUrl;
+                }
+              }
+
               await supabase.from('answers').insert([{
                 question_slug: selectedQuestion.slug,
                 text,
-                author: author || "Anonymous"
+                author,
+                image_url: imageUrl
               }]);
               showToast("Answer Sent! ✨");
               loadData();
@@ -195,14 +222,33 @@ function LandingPage({ onStart }) {
   );
 }
 
-function CreateQuestionPage({ onCreated }) {
+function CreateQuestionPage({ onCreated, showToast }) {
   const [text, setText] = useState('');
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if(!text.trim()) return;
+    setLoading(true);
+    await onCreated(text, file);
+    setLoading(false);
+  };
+
   return (
     <div className="max-w-lg mx-auto px-6 py-12">
       <div className="bg-white/5 border border-white/10 p-8 rounded-3xl">
         <h2 className="text-2xl font-bold mb-4">Create New Ask</h2>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Type question..." className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-white h-32 mb-4" />
-        <button onClick={() => onCreated(text)} className="w-full bg-purple-600 font-bold py-4 rounded-2xl">Generate Link →</button>
+        
+        {/* Optional Image Upload for Owner */}
+        <div className="mb-6">
+          <label className="text-xs font-semibold text-gray-400 block mb-2">Attach Image/Photo (Optional)</label>
+          <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} className="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600/20 file:text-purple-300 hover:file:bg-purple-600/40" />
+        </div>
+
+        <button disabled={loading} onClick={handleSubmit} className="w-full bg-purple-600 font-bold py-4 rounded-2xl">
+          {loading ? "Uploading & Generating..." : "Generate Link →"}
+        </button>
       </div>
     </div>
   );
@@ -219,7 +265,10 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
           questions.map(q => (
             <div key={q.id} className="bg-white/5 border border-white/10 p-6 rounded-3xl">
               <div className="flex justify-between items-center pb-4 border-b border-white/10">
-                <h3 className="font-bold text-lg">"{q.text}"</h3>
+                <div>
+                  <h3 className="font-bold text-lg">"{q.text}"</h3>
+                  {q.image_url && <a href={q.image_url} target="_blank" rel="noreferrer" className="text-xs text-purple-400 underline flex items-center gap-1 mt-1"><ImageIcon className="w-3 h-3"/> Attached Image</a>}
+                </div>
                 <div className="flex gap-2">
                   <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}?q=${q.slug}`); showToast("Link Copied!"); }} className="bg-amber-500/20 text-amber-300 px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Copy className="w-3.5 h-3.5"/> Copy Link</button>
                   <button onClick={() => onOpenStory(q)} className="bg-purple-600 text-white px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Instagram className="w-3.5 h-3.5"/> Question Story</button>
@@ -233,7 +282,8 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
                     <div key={a.id} className="bg-black/40 border border-white/10 p-3.5 rounded-2xl flex flex-col justify-between">
                       <div>
                         <span className="text-xs font-bold text-pink-400 block mb-1">{a.author}</span>
-                        <p className="text-xs text-gray-200 mb-3">{a.text}</p>
+                        <p className="text-xs text-gray-200 mb-2">{a.text}</p>
+                        {a.image_url && <a href={a.image_url} target="_blank" rel="noreferrer" className="text-[11px] text-pink-400 underline flex items-center gap-1 mb-3"><ImageIcon className="w-3 h-3"/> View Attached Photo</a>}
                       </div>
                       <button 
                         onClick={() => onOpenAnswerStory(q, a)}
@@ -277,22 +327,7 @@ function StoryCardGenerator({ question, showToast, onBack }) {
 
     ctx.fillStyle = '#590D22';
     ctx.font = 'bold 50px Inter';
-    
-    // Wrapped Text Logic
-    const words = question.text.split(' ');
-    let line = '';
-    let y = 880;
-    for (let n = 0; n < words.length; n++) {
-      let testLine = line + words[n] + ' ';
-      if (ctx.measureText(testLine).width > 720 && n > 0) {
-        ctx.fillText(line, 540, y);
-        line = words[n] + ' ';
-        y += 65;
-      } else {
-        line = testLine;
-      }
-    }
-    ctx.fillText(line, 540, y);
+    ctx.fillText(question.text, 540, 900);
 
     canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
   }, [question]);
@@ -314,12 +349,11 @@ function StoryCardGenerator({ question, showToast, onBack }) {
   );
 }
 
-// ANSWER STORY CARD GENERATOR WITH QUESTION & ANSWER TEXT WRAPPING
+// FIXED ANSWER STORY CARD GENERATOR (CLEAR QUESTION + ANSWER + OPTIONAL MEDIA)
 function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
   const canvasRef = useRef(null);
   const [imgUrl, setImgUrl] = useState('');
 
-  // Helper to render wrapped text inside canvas
   const renderWrappedText = (ctx, text, startX, startY, maxWidth, lineHeight) => {
     const words = text.split(' ');
     let line = '';
@@ -345,37 +379,37 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
 
     // Background Gradient
     const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
-    gradient.addColorStop(0, '#2E1065');
-    gradient.addColorStop(1, '#090514');
+    gradient.addColorStop(0, '#1E1B4B');
+    gradient.addColorStop(1, '#0F172A');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // 1. QUESTION BOX (Top)
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.roundRect(120, 380, 840, 360, 36);
+    // 1. QUESTION BOX (TOP)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.roundRect(100, 320, 880, 360, 40);
     ctx.fill();
 
-    ctx.fillStyle = '#A855F7';
+    ctx.fillStyle = '#C084FC';
     ctx.font = 'bold 30px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('QUESTION', 540, 450);
+    ctx.fillText('QUESTION', 540, 390);
 
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 38px Inter, sans-serif';
-    renderWrappedText(ctx, `"${question.text}"`, 540, 530, 750, 52);
+    renderWrappedText(ctx, `"${question.text}"`, 540, 470, 780, 50);
 
-    // 2. ANSWER BOX (Main Center)
+    // 2. ANSWER BOX (BOTTOM)
     ctx.fillStyle = '#FFFFFF';
-    ctx.roundRect(120, 800, 840, 600, 48);
+    ctx.roundRect(100, 740, 880, 680, 48);
     ctx.fill();
 
-    ctx.fillStyle = '#EC4899';
+    ctx.fillStyle = '#DB2777';
     ctx.font = 'bold 32px Inter, sans-serif';
-    ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, 880);
+    ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, 830);
 
     ctx.fillStyle = '#111827';
     ctx.font = 'bold 44px Inter, sans-serif';
-    renderWrappedText(ctx, `"${answer.text}"`, 540, 980, 750, 60);
+    renderWrappedText(ctx, `"${answer.text}"`, 540, 930, 780, 58);
 
     // Watermark
     ctx.fillStyle = '#9CA3AF';
@@ -409,15 +443,37 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
   );
 }
 
+// PUBLIC ANSWER PAGE (MANDATORY USERNAME & OPTIONAL FILE ATTACHMENT)
 function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }) {
   const [text, setText] = useState('');
   const [author, setAuthor] = useState('');
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+
+  const handleSubmit = async () => {
+    if(!author.trim()) {
+      showToast("Instagram username is COMPULSORY! ⚠️");
+      return;
+    }
+    if(!text.trim()) {
+      showToast("Please write an answer!");
+      return;
+    }
+
+    setLoading(true);
+    const formattedAuthor = author.startsWith('@') ? author : `@${author}`;
+    await onAnswerSubmit(text, formattedAuthor, file);
+    setLoading(false);
+    setSent(true);
+  };
 
   return (
     <div className="max-w-md mx-auto px-6 py-12 text-center">
       <div className="bg-white/5 border border-white/10 p-8 rounded-3xl">
-        <h2 className="text-xl font-bold mb-6">"{question.text}"</h2>
+        <h2 className="text-xl font-bold mb-4">"{question.text}"</h2>
+        {question.image_url && <img src={question.image_url} alt="Question media" className="w-full h-40 object-cover rounded-2xl mb-4 border border-white/10" />}
+
         {sent ? (
           <div>
             <p className="text-green-400 font-bold mb-4">✨ Answer Sent Live!</p>
@@ -425,9 +481,39 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }
           </div>
         ) : (
           <div className="space-y-4">
-            <input type="text" value={author} onChange={e => setAuthor(e.target.value)} placeholder="@your_instagram" className="w-full bg-black/40 border border-white/10 rounded-2xl p-3 text-xs text-white" />
-            <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Type answer..." className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white h-32" />
-            <button onClick={() => { if(text.trim()){ onAnswerSubmit(text, author); setSent(true); } }} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 font-bold py-3.5 rounded-2xl">Send Answer ✨</button>
+            
+            {/* COMPULSORY USERNAME FIELD */}
+            <div>
+              <input 
+                type="text" 
+                value={author} 
+                onChange={e => setAuthor(e.target.value)} 
+                placeholder="Your Instagram handle (Compulsory)*" 
+                className="w-full bg-black/40 border border-pink-500/40 focus:border-pink-500 rounded-2xl p-3 text-xs text-white" 
+              />
+              <span className="text-[10px] text-pink-400 float-left mt-1 ml-1">* Required field</span>
+            </div>
+
+            <textarea 
+              value={text} 
+              onChange={e => setText(e.target.value)} 
+              placeholder="Type your answer here..." 
+              className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white h-32" 
+            />
+
+            {/* OPTIONAL IMAGE UPLOAD BY VIEWER */}
+            <div className="text-left">
+              <label className="text-[11px] font-semibold text-gray-400 block mb-1">Attach a photo with answer (Optional)</label>
+              <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} className="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600/20 file:text-purple-300 hover:file:bg-purple-600/40" />
+            </div>
+
+            <button 
+              disabled={loading} 
+              onClick={handleSubmit} 
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 font-bold py-3.5 rounded-2xl shadow-lg mt-2"
+            >
+              {loading ? "Sending..." : "Send Answer ✨"}
+            </button>
           </div>
         )}
       </div>
