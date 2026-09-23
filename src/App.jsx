@@ -5,7 +5,8 @@ import {
   Copy, 
   Trash2, 
   Instagram,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Sliders
 } from 'lucide-react';
 
 // SUPABASE CONFIGURATION
@@ -299,11 +300,16 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
   );
 }
 
-// STORY CARD GENERATOR WITH ASYNC IMAGE SUPPORT
 function StoryCardGenerator({ question, showToast, onBack }) {
   const canvasRef = useRef(null);
   const [imgUrl, setImgUrl] = useState('');
   const currentUrl = `${window.location.origin}?q=${question.slug}`;
+
+  // Customization States
+  const [bgColor, setBgColor] = useState('#FFE5EC');
+  const [cardColor, setCardColor] = useState('#FFFFFF');
+  const [textColor, setTextColor] = useState('#590D22');
+  const [fontSize, setFontSize] = useState(48);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -312,13 +318,13 @@ function StoryCardGenerator({ question, showToast, onBack }) {
     canvas.width = 1080; canvas.height = 1920;
     
     const drawCard = (qImg = null) => {
-      ctx.fillStyle = '#FFE5EC';
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, 1080, 1920);
 
-      const boxY = qImg ? 450 : 620;
-      const boxHeight = qImg ? 950 : 580;
+      const boxY = qImg ? 450 : 600;
+      const boxHeight = qImg ? 950 : 650;
 
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = cardColor;
       ctx.roundRect(120, boxY, 840, boxHeight, 48);
       ctx.fill();
 
@@ -331,10 +337,10 @@ function StoryCardGenerator({ question, showToast, onBack }) {
         ctx.drawImage(qImg, 240, boxY + 140, 600, 400);
       }
 
-      ctx.fillStyle = '#590D22';
-      ctx.font = 'bold 48px Inter, sans-serif';
+      ctx.fillStyle = textColor;
+      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
 
-      const textY = qImg ? boxY + 620 : boxY + 260;
+      const textY = qImg ? boxY + 620 : boxY + 220;
       const words = question.text.split(' ');
       let line = '';
       let curY = textY;
@@ -343,7 +349,7 @@ function StoryCardGenerator({ question, showToast, onBack }) {
         if (ctx.measureText(testLine).width > 720 && n > 0) {
           ctx.fillText(line, 540, curY);
           line = words[n] + ' ';
-          curY += 60;
+          curY += fontSize + 15;
         } else {
           line = testLine;
         }
@@ -362,31 +368,62 @@ function StoryCardGenerator({ question, showToast, onBack }) {
     } else {
       drawCard(null);
     }
-  }, [question]);
+  }, [question, bgColor, cardColor, textColor, fontSize]);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-10">
+    <div className="max-w-5xl mx-auto px-6 py-10">
       <button onClick={onBack} className="text-xs text-gray-400 mb-6 block">← Back to Dashboard</button>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         <div className="flex flex-col items-center">
           <canvas ref={canvasRef} className="hidden" />
           {imgUrl && <img src={imgUrl} className="w-64 h-[450px] rounded-3xl object-cover shadow-2xl border border-white/10" />}
         </div>
-        <div className="space-y-4">
-          <button onClick={() => { navigator.clipboard.writeText(currentUrl); showToast("Link Copied!"); }} className="w-full bg-amber-500 text-black font-bold py-3 rounded-2xl">1. Copy Link</button>
-          <a href={imgUrl} download={`askly-${question.slug}.png`} className="w-full bg-purple-600 text-white font-bold py-3 rounded-2xl block text-center">2. Download Story Image</a>
+        <div className="space-y-6 bg-white/5 border border-white/10 p-6 rounded-3xl">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Sliders className="w-4 h-4 text-purple-400"/> Customize Question Story</h2>
+          
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div>
+              <label className="text-gray-400 block mb-1">Background Color</label>
+              <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} className="w-full h-10 rounded-xl bg-transparent cursor-pointer" />
+            </div>
+            <div>
+              <label className="text-gray-400 block mb-1">Card Color</label>
+              <input type="color" value={cardColor} onChange={e => setCardColor(e.target.value)} className="w-full h-10 rounded-xl bg-transparent cursor-pointer" />
+            </div>
+            <div>
+              <label className="text-gray-400 block mb-1">Text Color</label>
+              <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} className="w-full h-10 rounded-xl bg-transparent cursor-pointer" />
+            </div>
+            <div>
+              <label className="text-gray-400 block mb-1">Font Size ({fontSize}px)</label>
+              <input type="range" min="32" max="64" value={fontSize} onChange={e => setFontSize(Number(e.target.value))} className="w-full mt-2 accent-purple-500" />
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-4 border-t border-white/10">
+            <button onClick={() => { navigator.clipboard.writeText(currentUrl); showToast("Link Copied!"); }} className="w-full bg-amber-500 text-black font-bold py-3 rounded-2xl text-xs">1. Copy Link</button>
+            <a href={imgUrl} download={`askly-${question.slug}.png`} className="w-full bg-purple-600 text-white font-bold py-3 rounded-2xl block text-center text-xs">2. Download Story Image 📸</a>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// PERFECTED ANSWER STORY CARD GENERATOR WITH BOTH QUESTION & ANSWER (PLUS ASYNC IMAGES)
+// ANSWER STORY CARD GENERATOR WITH FULL CUSTOMIZATION CONTROLS
 function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
   const canvasRef = useRef(null);
   const [imgUrl, setImgUrl] = useState('');
 
-  const renderWrappedText = (ctx, text, startX, startY, maxWidth, lineHeight) => {
+  // Customization States
+  const [bgGrad, setBgGrad] = useState('dark');
+  const [cardColor, setCardColor] = useState('#FFFFFF');
+  const [textColor, setTextColor] = useState('#111827');
+  const [fontSize, setFontSize] = useState(42);
+
+  const renderWrappedText = (ctx, text, startX, startY, maxWidth, lineHeight, fSize, tColor) => {
+    ctx.fillStyle = tColor;
+    ctx.font = `bold ${fSize}px Inter, sans-serif`;
     const words = text.split(' ');
     let line = '';
     let currentY = startY;
@@ -412,50 +449,52 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
     const drawAnswerCard = (aImg = null) => {
       // 1. Background Gradient
       const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
-      gradient.addColorStop(0, '#1E1B4B');
-      gradient.addColorStop(1, '#0F172A');
+      if (bgGrad === 'dark') {
+        gradient.addColorStop(0, '#1E1B4B');
+        gradient.addColorStop(1, '#0F172A');
+      } else if (bgGrad === 'pink') {
+        gradient.addColorStop(0, '#831843');
+        gradient.addColorStop(1, '#310413');
+      } else {
+        gradient.addColorStop(0, '#064E3B');
+        gradient.addColorStop(1, '#022C22');
+      }
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, 1080, 1920);
 
       // 2. QUESTION BOX (TOP)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.roundRect(100, 300, 880, 320, 40);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.roundRect(100, 220, 880, 280, 36);
       ctx.fill();
 
-      ctx.fillStyle = '#C084FC';
-      ctx.font = 'bold 28px Inter, sans-serif';
+      ctx.fillStyle = '#E9D5FF';
+      ctx.font = 'bold 26px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('QUESTION', 540, 360);
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 36px Inter, sans-serif';
-      renderWrappedText(ctx, `"${question.text}"`, 540, 430, 780, 48);
+      ctx.fillText(`Q: ${question.text}`, 540, 365);
 
       // 3. ANSWER BOX (BOTTOM)
-      const answerBoxY = 680;
-      const answerBoxHeight = aImg ? 900 : 580;
+      const answerBoxY = 550;
+      const answerBoxHeight = aImg ? 1150 : 950;
 
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = cardColor;
       ctx.roundRect(100, answerBoxY, 880, answerBoxHeight, 48);
       ctx.fill();
 
       ctx.fillStyle = '#DB2777';
-      ctx.font = 'bold 30px Inter, sans-serif';
+      ctx.font = 'bold 28px Inter, sans-serif';
       ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, answerBoxY + 70);
 
       if (aImg) {
-        ctx.drawImage(aImg, 240, answerBoxY + 110, 600, 380);
+        ctx.drawImage(aImg, 180, answerBoxY + 110, 720, 480);
       }
 
-      ctx.fillStyle = '#111827';
-      ctx.font = 'bold 42px Inter, sans-serif';
-      const ansTextY = aImg ? answerBoxY + 550 : answerBoxY + 180;
-      renderWrappedText(ctx, `"${answer.text}"`, 540, ansTextY, 780, 54);
+      const ansTextY = aImg ? answerBoxY + 640 : answerBoxY + 160;
+      renderWrappedText(ctx, `"${answer.text}"`, 540, ansTextY, 780, fontSize + 12, fontSize, textColor);
 
       // Watermark
       ctx.fillStyle = '#9CA3AF';
-      ctx.font = 'bold 28px Inter, sans-serif';
-      ctx.fillText('ASKLY BY FIRST FUEL', 540, 1800);
+      ctx.font = 'bold 26px Inter, sans-serif';
+      ctx.fillText('ASKLY BY FIRST FUEL', 540, 1840);
 
       canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
     };
@@ -469,26 +508,53 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
     } else {
       drawAnswerCard(null);
     }
-  }, [question, answer]);
+  }, [question, answer, bgGrad, cardColor, textColor, fontSize]);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-10">
+    <div className="max-w-5xl mx-auto px-6 py-10">
       <button onClick={onBack} className="text-xs text-gray-400 mb-6 block">← Back to Dashboard</button>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         <div className="flex flex-col items-center">
           <canvas ref={canvasRef} className="hidden" />
           {imgUrl && <img src={imgUrl} className="w-64 h-[450px] rounded-3xl object-cover shadow-2xl border border-white/10" />}
         </div>
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-white">Share Answer to IG Story</h2>
-          <p className="text-xs text-gray-400">Download this card featuring both the question and answer to post on your Instagram Story!</p>
-          <a 
-            href={imgUrl} 
-            download={`askly-answer-${question.slug}.png`} 
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 rounded-2xl block text-center shadow-lg hover:opacity-90 transition-all"
-          >
-            Download Answer Story Image 📸
-          </a>
+        <div className="space-y-6 bg-white/5 border border-white/10 p-6 rounded-3xl">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Sliders className="w-4 h-4 text-purple-400"/> Customize Answer Story</h2>
+          
+          <div className="space-y-4 text-xs">
+            <div>
+              <label className="text-gray-400 block mb-1">Background Theme</label>
+              <select value={bgGrad} onChange={e => setBgGrad(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-white">
+                <option value="dark">Deep Indigo / Dark</option>
+                <option value="pink">Ruby Maroon</option>
+                <option value="emerald">Emerald Green</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-gray-400 block mb-1">Answer Card Color</label>
+                <input type="color" value={cardColor} onChange={e => setCardColor(e.target.value)} className="w-full h-10 rounded-xl bg-transparent cursor-pointer" />
+              </div>
+              <div>
+                <label className="text-gray-400 block mb-1">Answer Text Color</label>
+                <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} className="w-full h-10 rounded-xl bg-transparent cursor-pointer" />
+              </div>
+            </div>
+            <div>
+              <label className="text-gray-400 block mb-1">Text Font Size ({fontSize}px)</label>
+              <input type="range" min="30" max="56" value={fontSize} onChange={e => setFontSize(Number(e.target.value))} className="w-full mt-2 accent-purple-500" />
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-4 border-t border-white/10">
+            <a 
+              href={imgUrl} 
+              download={`askly-answer-${question.slug}.png`} 
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3.5 rounded-2xl block text-center shadow-lg text-xs"
+            >
+              Download Custom Story Image 📸
+            </a>
+          </div>
         </div>
       </div>
     </div>
