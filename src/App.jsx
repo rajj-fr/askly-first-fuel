@@ -1,14 +1,3 @@
-Screenshot me saaf dikh raha hai ki **Question text abhi bhi upar wale box ke andar print nahi ho raha hai** (woh box bilkul blank/white hai), aur sath hi aapne abhi voice notes ka feature bhi add kar liya hai.
-
-Is problem ko 100% permanently fix karne ke liye aur **Voice Note support ko Story Canvas ke sath integrate** karne ke liye code ko bilkul correct kar diya gaya hai. Ab Question text, Answer text aur agar Voice Note hoga toh uska icon/text bilkul crystal clear canvas par print hoga!
-
----
-
-### **Updated `src/App.jsx` Code:**
-
-GitHub par **`src/App.jsx`** file ko edit karein, is poore code se **replace** kar ke **Commit changes** kar dein (aur apni Supabase Anon Key top par zaroor paste kar lena):
-
-```jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
@@ -19,8 +8,7 @@ import {
   Image as ImageIcon,
   Sliders,
   Mic,
-  Square,
-  Play
+  Square
 } from 'lucide-react';
 
 // SUPABASE CONFIGURATION
@@ -61,7 +49,6 @@ export default function App() {
 
   useEffect(() => {
     loadData();
-
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
@@ -257,8 +244,10 @@ function LandingPage({ onStart }) {
   );
 }
 
+// VOICE RECORDER COMPONENT WITH EFFECTS
 function VoiceRecorder({ onAudioReady }) {
   const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [effect, setEffect] = useState('normal');
   const mediaRecorderRef = useRef(null);
@@ -286,7 +275,7 @@ function VoiceRecorder({ onAudioReady }) {
       mediaRecorder.start();
       setRecording(true);
     } catch (err) {
-      alert("Microphone access denied.");
+      alert("Microphone access permission required.");
     }
   };
 
@@ -297,28 +286,30 @@ function VoiceRecorder({ onAudioReady }) {
     }
   };
 
-  const [audioBlob, setAudioBlob] = useState(null);
-
   const applyAudioEffect = async (blob, effectType) => {
     if (effectType === 'normal') return blob;
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const arrayBuffer = await blob.arrayBuffer();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-    const offlineCtx = new OfflineAudioContext(
-      audioBuffer.numberOfChannels,
-      audioBuffer.length,
-      audioBuffer.sampleRate
-    );
+      const offlineCtx = new OfflineAudioContext(
+        audioBuffer.numberOfChannels,
+        audioBuffer.length,
+        audioBuffer.sampleRate
+      );
 
-    const source = offlineCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.playbackRate.value = effectType === 'chipmunk' ? 1.4 : 0.75;
+      const source = offlineCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.playbackRate.value = effectType === 'chipmunk' ? 1.4 : 0.75;
 
-    source.connect(offlineCtx.destination);
-    source.start(0);
-    const renderedBuffer = await offlineCtx.startRendering();
-    return new Blob([renderedBuffer.getChannelData(0)], { type: 'audio/webm' });
+      source.connect(offlineCtx.destination);
+      source.start(0);
+      const renderedBuffer = await offlineCtx.startRendering();
+      return new Blob([renderedBuffer.getChannelData(0)], { type: 'audio/webm' });
+    } catch (e) {
+      return blob;
+    }
   };
 
   return (
@@ -355,7 +346,7 @@ function CreateQuestionPage({ onCreated, showToast }) {
 
   const handleSubmit = async () => {
     if(!text.trim() && !audioBlob) {
-      showToast("Add text or voice note!");
+      showToast("Please type text or record voice note!");
       return;
     }
     setLoading(true);
@@ -566,11 +557,9 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
     canvas.width = 1080; canvas.height = 1920;
 
     const drawAnswerCard = (aImg = null) => {
-      // 1. Background
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, 1080, 1920);
 
-      // 2. QUESTION BOX (FIXED RENDERING)
       const qBoxY = 150;
       ctx.fillStyle = qBoxColor;
       ctx.roundRect(100, qBoxY, 880, qBoxHeight, 36);
@@ -582,18 +571,8 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
       ctx.fillText('QUESTION', 540, qBoxY + 50);
 
       const qTextContent = question.text ? `"${question.text}"` : "🎙️ Voice Question";
-      drawWrappedText(
-        ctx, 
-        qTextContent, 
-        540, 
-        qBoxY + 110, 
-        780, 
-        qFontSize + 10, 
-        qFontSize, 
-        qTextColor
-      );
+      drawWrappedText(ctx, qTextContent, 540, qBoxY + 110, 780, qFontSize + 10, qFontSize, qTextColor);
 
-      // 3. ANSWER BOX
       const aBoxY = qBoxY + qBoxHeight + 50;
       const actualABoxHeight = aImg ? aBoxHeight + 300 : aBoxHeight;
 
@@ -612,18 +591,8 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
 
       const ansTextY = aImg ? aBoxY + 520 : aBoxY + 140;
       const aTextContent = answer.text ? `"${answer.text}"` : "🎙️ Voice Note Answer";
-      drawWrappedText(
-        ctx, 
-        aTextContent, 
-        540, 
-        ansTextY, 
-        780, 
-        aFontSize + 10, 
-        aFontSize, 
-        aTextColor
-      );
+      drawWrappedText(ctx, aTextContent, 540, ansTextY, 780, aFontSize + 10, aFontSize, aTextColor);
 
-      // Watermark
       ctx.fillStyle = '#9CA3AF';
       ctx.font = 'bold 26px Inter, sans-serif';
       ctx.textAlign = 'center';
@@ -792,5 +761,3 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }
     </div>
   );
 }
-
-```
