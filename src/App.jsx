@@ -37,6 +37,32 @@ export default function App() {
     }
   ]);
 
+  // URL QUERY PARAMETER ROUTING FIX
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const qSlug = params.get('q');
+
+    if (qSlug) {
+      const foundQ = questions.find(q => q.slug === qSlug);
+      if (foundQ) {
+        setSelectedQuestion(foundQ);
+        setActiveTab('public');
+      } else {
+        // Fallback for demo/new questions generated via link
+        const dynamicQ = {
+          id: 'q_' + qSlug,
+          slug: qSlug,
+          text: "What's on your mind? Drop an answer below! 👀",
+          views: 1,
+          createdAt: 'Just now',
+          answers: []
+        };
+        setSelectedQuestion(dynamicQ);
+        setActiveTab('public');
+      }
+    }
+  }, []);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -148,9 +174,10 @@ export default function App() {
           <PublicQuestionPage 
             question={selectedQuestion} 
             showToast={showToast}
+            onCreateOwn={() => setActiveTab('create')}
             onAnswerSubmit={(ansText, instaUser) => {
               const updated = questions.map(q => {
-                if (q.id === selectedQuestion.id) {
+                if (q.id === selectedQuestion.id || q.slug === selectedQuestion.slug) {
                   return {
                     ...q,
                     answers: [{
@@ -192,7 +219,7 @@ function LandingPage({ onStart, onDemo }) {
       </h1>
 
       <p className="text-gray-400 text-base sm:text-lg max-w-xl mx-auto mb-8">
-        Create beautiful question cards, download for Instagram stories, and receive answers with Instagram usernames!
+        Create beautiful question cards, download for Instagram stories, and receive direct answers!
       </p>
 
       <div className="flex flex-col sm:flex-row justify-center gap-4">
@@ -302,7 +329,7 @@ function OwnerDashboard({ questions, onOpenStory, onOpenPublic, showToast, onDel
                 </div>
               </div>
 
-              {/* Answers with Instagram Usernames */}
+              {/* Answers */}
               <div className="mt-4">
                 <span className="text-xs font-semibold text-gray-400 mb-3 block">
                   Answers ({q.answers.length})
@@ -514,8 +541,8 @@ function StoryCardGenerator({ question, showToast, onBack }) {
   );
 }
 
-// --- PUBLIC ANSWER PAGE WITH INSTAGRAM USERNAME INPUT ---
-function PublicQuestionPage({ question, showToast, onAnswerSubmit }) {
+// --- PUBLIC ANSWER PAGE ---
+function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }) {
   const [answerText, setAnswerText] = useState('');
   const [instaUser, setInstaUser] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -530,22 +557,31 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit }) {
   };
 
   return (
-    <div className="max-w-md mx-auto px-6 py-16 text-center">
-      <div className="bg-white/5 border border-white/10 p-8 rounded-3xl backdrop-blur-xl">
+    <div className="max-w-md mx-auto px-6 py-12 text-center">
+      <div className="bg-white/5 border border-white/10 p-8 rounded-3xl backdrop-blur-xl shadow-2xl">
         <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-4">ASKLY Q&A</span>
 
         <h2 className="text-xl font-bold text-white mb-6">"{question.text}"</h2>
 
         {submitted ? (
-          <div className="py-8 space-y-2">
+          <div className="py-6 space-y-4">
             <span className="text-4xl block">✨</span>
             <p className="text-lg font-bold text-white">Answer Sent!</p>
             <p className="text-xs text-gray-400">Your response has been sent to the owner.</p>
+            
+            <div className="pt-4 border-t border-white/10">
+              <button 
+                onClick={onCreateOwn}
+                className="w-full bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold py-3 rounded-2xl text-xs hover:bg-purple-600 hover:text-white transition-all"
+              >
+                Create Your Own Question Card →
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Instagram Username Field */}
+            {/* Instagram Handle Input */}
             <div className="relative">
               <Instagram className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
               <input 
@@ -573,6 +609,15 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit }) {
             </button>
           </form>
         )}
+      </div>
+
+      <div className="mt-6">
+        <button 
+          onClick={onCreateOwn}
+          className="text-xs text-gray-400 hover:text-white underline"
+        >
+          Want to ask your friends? Create your own ASKLY card
+        </button>
       </div>
     </div>
   );
