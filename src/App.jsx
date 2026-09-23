@@ -14,7 +14,8 @@ import {
   ExternalLink,
   Sun,
   Moon,
-  Palette
+  Palette,
+  User
 } from 'lucide-react';
 
 export default function App() {
@@ -30,7 +31,7 @@ export default function App() {
       views: 384,
       createdAt: '2 hours ago',
       answers: [
-        { id: 'a1', text: "You are actually really funny 😂", author: "Anonymous", time: "2 min ago" },
+        { id: 'a1', text: "You are actually really funny 😂", author: "@arjun_dev", time: "2 min ago" },
         { id: 'a2', text: "I've had a crush on you since last year...", author: "Anonymous", time: "8 min ago" }
       ]
     }
@@ -147,7 +148,7 @@ export default function App() {
           <PublicQuestionPage 
             question={selectedQuestion} 
             showToast={showToast}
-            onAnswerSubmit={(ansText) => {
+            onAnswerSubmit={(ansText, instaUser) => {
               const updated = questions.map(q => {
                 if (q.id === selectedQuestion.id) {
                   return {
@@ -155,7 +156,7 @@ export default function App() {
                     answers: [{
                       id: 'a' + Date.now(),
                       text: ansText,
-                      author: "Anonymous",
+                      author: instaUser ? (instaUser.startsWith('@') ? instaUser : `@${instaUser}`) : "Anonymous",
                       time: "Just now"
                     }, ...q.answers]
                   }
@@ -191,7 +192,7 @@ function LandingPage({ onStart, onDemo }) {
       </h1>
 
       <p className="text-gray-400 text-base sm:text-lg max-w-xl mx-auto mb-8">
-        Create beautiful question cards, download for Instagram stories, and receive direct anonymous answers!
+        Create beautiful question cards, download for Instagram stories, and receive answers with Instagram usernames!
       </p>
 
       <div className="flex flex-col sm:flex-row justify-center gap-4">
@@ -230,7 +231,7 @@ function CreateQuestionPage({ onCreated }) {
     <div className="max-w-lg mx-auto px-6 py-12">
       <div className="bg-white/5 border border-white/10 p-8 rounded-3xl backdrop-blur-xl">
         <h2 className="text-2xl font-bold text-white mb-2">Create New Ask</h2>
-        <p className="text-gray-400 text-sm mb-6">Type a question you want people to answer secretly.</p>
+        <p className="text-gray-400 text-sm mb-6">Type a question you want people to answer.</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -270,8 +271,6 @@ function OwnerDashboard({ questions, onOpenStory, onOpenPublic, showToast, onDel
 
       <div className="space-y-6">
         {questions.map((q) => {
-          const answerLink = `${window.location.origin}?q=${q.slug}`;
-
           return (
             <div key={q.id} className="bg-white/5 border border-white/10 rounded-3xl p-6">
               
@@ -303,7 +302,7 @@ function OwnerDashboard({ questions, onOpenStory, onOpenPublic, showToast, onDel
                 </div>
               </div>
 
-              {/* Answers */}
+              {/* Answers with Instagram Usernames */}
               <div className="mt-4">
                 <span className="text-xs font-semibold text-gray-400 mb-3 block">
                   Answers ({q.answers.length})
@@ -314,7 +313,12 @@ function OwnerDashboard({ questions, onOpenStory, onOpenPublic, showToast, onDel
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {q.answers.map((ans) => (
                       <div key={ans.id} className="bg-black/40 border border-white/10 p-3.5 rounded-2xl">
-                        <span className="text-[10px] font-bold text-purple-400 block mb-1">{ans.time}</span>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-xs font-bold text-pink-400 flex items-center gap-1">
+                            <Instagram className="w-3 h-3 text-pink-400" /> {ans.author}
+                          </span>
+                          <span className="text-[10px] text-gray-500">{ans.time}</span>
+                        </div>
                         <p className="text-xs text-gray-200">{ans.text}</p>
                       </div>
                     ))}
@@ -330,20 +334,16 @@ function OwnerDashboard({ questions, onOpenStory, onOpenPublic, showToast, onDel
   );
 }
 
-// --- STORY CARD GENERATOR (WITH LIGHT THEMES & MOBILE DOWNLOAD FIX) ---
+// --- STORY CARD GENERATOR ---
 function StoryCardGenerator({ question, showToast, onBack }) {
   const canvasRef = useRef(null);
   const [selectedTheme, setSelectedTheme] = useState('lightPink');
   const [generatedImgUrl, setGeneratedImgUrl] = useState('');
 
-  // LIGHT & DARK THEMES PALETTE
   const themes = {
-    // Light Themes
     lightPink: { name: 'Pastel Pink 🌸', bg1: '#FFE5EC', bg2: '#FFB3C6', text: '#590D22', cardBg: '#FFFFFF', cardText: '#590D22', badgeBg: '#FF80A0', isLight: true },
     lightMint: { name: 'Fresh Mint 🍃', bg1: '#E8F5E9', bg2: '#C8E6C9', text: '#1B5E20', cardBg: '#FFFFFF', cardText: '#1B5E20', badgeBg: '#66BB6A', isLight: true },
     lightMinimal: { name: 'Clean White 🤍', bg1: '#F8FAFC', bg2: '#E2E8F0', text: '#0F172A', cardBg: '#FFFFFF', cardText: '#0F172A', badgeBg: '#64748B', isLight: true },
-    
-    // Dark Themes
     darkPurple: { name: 'Neon Purple 🔮', bg1: '#2E1065', bg2: '#090514', text: '#FFFFFF', cardBg: 'rgba(255,255,255,0.12)', cardText: '#FFFFFF', badgeBg: '#A855F7', isLight: false },
     darkMidnight: { name: 'Midnight 🌌', bg1: '#0F172A', bg2: '#020617', text: '#FFFFFF', cardBg: 'rgba(255,255,255,0.08)', cardText: '#FFFFFF', badgeBg: '#38BDF8', isLight: false },
   };
@@ -360,14 +360,12 @@ function StoryCardGenerator({ question, showToast, onBack }) {
 
     const theme = themes[selectedTheme];
 
-    // Background Gradient
     const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
     gradient.addColorStop(0, theme.bg1);
     gradient.addColorStop(1, theme.bg2);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // Main Question Card Box
     ctx.fillStyle = theme.cardBg;
     ctx.roundRect(120, 620, 840, 580, 48);
     ctx.fill();
@@ -378,13 +376,11 @@ function StoryCardGenerator({ question, showToast, onBack }) {
       ctx.shadowOffsetY = 15;
     }
 
-    // Top App Name
     ctx.fillStyle = theme.badgeBg;
     ctx.font = 'bold 38px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('ASKLY', 540, 730);
 
-    // Question Text Render
     ctx.fillStyle = theme.cardText;
     ctx.font = 'bold 50px Inter, sans-serif';
     
@@ -404,17 +400,14 @@ function StoryCardGenerator({ question, showToast, onBack }) {
     }
     ctx.fillText(line, 540, y);
 
-    // Call to Action
     ctx.fillStyle = theme.isLight ? '#64748B' : 'rgba(255,255,255,0.8)';
     ctx.font = '32px Inter, sans-serif';
-    ctx.fillText('Tap Link Sticker to Answer Anonymously 💬', 540, 1110);
+    ctx.fillText('Tap Link Sticker to Answer 💬', 540, 1110);
 
-    // Watermark
     ctx.fillStyle = theme.isLight ? '#94A3B8' : '#6B7280';
     ctx.font = 'bold 28px Inter, sans-serif';
     ctx.fillText('CREATED BY FIRST FUEL', 540, 1800);
 
-    // Convert Canvas to Image URL for Mobile Compatibility
     canvas.toBlob((blob) => {
       if (blob) {
         const url = URL.createObjectURL(blob);
@@ -432,14 +425,13 @@ function StoryCardGenerator({ question, showToast, onBack }) {
   const handleDownload = () => {
     if (!generatedImgUrl) return;
 
-    // Mobile Direct Download Handler
     const a = document.createElement('a');
     a.href = generatedImgUrl;
     a.download = `askly-${question.slug}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    showToast("Downloading image! If popup blocked, long press card below to save image 📸");
+    showToast("Downloading image! Long press card below if needed 📸");
   };
 
   return (
@@ -449,8 +441,6 @@ function StoryCardGenerator({ question, showToast, onBack }) {
       </button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-        
-        {/* Preview Container */}
         <div className="flex flex-col items-center">
           <canvas ref={canvasRef} className="hidden" />
           {generatedImgUrl && (
@@ -461,18 +451,16 @@ function StoryCardGenerator({ question, showToast, onBack }) {
             />
           )}
           <span className="text-[11px] text-gray-400 mt-2 text-center">
-            💡 Mobile Tip: Long press image to save directly to Photos
+            💡 Long press image to save directly to Photos
           </span>
         </div>
 
-        {/* Customization Controls */}
         <div className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-white mb-1">Story Customizer</h2>
             <p className="text-xs text-gray-400">Choose colors & copy link for your IG Story Sticker</p>
           </div>
 
-          {/* Theme Selector */}
           <div>
             <label className="block text-xs font-bold text-purple-400 uppercase mb-3">Select Color Theme</label>
             <div className="flex flex-wrap gap-2">
@@ -492,7 +480,6 @@ function StoryCardGenerator({ question, showToast, onBack }) {
             </div>
           </div>
 
-          {/* Answer Link Box */}
           <div className="bg-white/5 border border-white/10 p-4 rounded-2xl space-y-2">
             <span className="text-xs font-bold text-amber-400 uppercase block">Step 1: Copy Question Link</span>
             <div className="flex items-center gap-2">
@@ -509,10 +496,8 @@ function StoryCardGenerator({ question, showToast, onBack }) {
                 Copy
               </button>
             </div>
-            <p className="text-[11px] text-gray-400">Paste this link inside Instagram Story's "Link Sticker".</p>
           </div>
 
-          {/* Download Button */}
           <div className="space-y-2">
             <span className="text-xs font-bold text-purple-400 uppercase block">Step 2: Save Image</span>
             <button 
@@ -529,24 +514,25 @@ function StoryCardGenerator({ question, showToast, onBack }) {
   );
 }
 
-// --- PUBLIC ANSWER PAGE ---
+// --- PUBLIC ANSWER PAGE WITH INSTAGRAM USERNAME INPUT ---
 function PublicQuestionPage({ question, showToast, onAnswerSubmit }) {
   const [answerText, setAnswerText] = useState('');
+  const [instaUser, setInstaUser] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!answerText.trim()) return;
 
-    onAnswerSubmit(answerText);
+    onAnswerSubmit(answerText, instaUser.trim());
     setSubmitted(true);
-    showToast("Answer sent anonymously! ✨");
+    showToast("Answer sent successfully! ✨");
   };
 
   return (
     <div className="max-w-md mx-auto px-6 py-16 text-center">
       <div className="bg-white/5 border border-white/10 p-8 rounded-3xl backdrop-blur-xl">
-        <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-4">ASKLY Anonymous Q&A</span>
+        <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-4">ASKLY Q&A</span>
 
         <h2 className="text-xl font-bold text-white mb-6">"{question.text}"</h2>
 
@@ -554,21 +540,36 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit }) {
           <div className="py-8 space-y-2">
             <span className="text-4xl block">✨</span>
             <p className="text-lg font-bold text-white">Answer Sent!</p>
-            <p className="text-xs text-gray-400">Your response was sent secretly to the owner.</p>
+            <p className="text-xs text-gray-400">Your response has been sent to the owner.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            
+            {/* Instagram Username Field */}
+            <div className="relative">
+              <Instagram className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
+              <input 
+                type="text"
+                value={instaUser}
+                onChange={(e) => setInstaUser(e.target.value)}
+                placeholder="Your Instagram handle (e.g. @username)"
+                className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-white text-xs placeholder-gray-500 focus:outline-none focus:border-pink-500"
+              />
+            </div>
+
+            {/* Answer Text Area */}
             <textarea 
               value={answerText}
               onChange={(e) => setAnswerText(e.target.value)}
-              placeholder="Send your secret answer..."
+              placeholder="Type your answer here..."
               className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 h-32 resize-none text-sm"
             />
+
             <button 
               type="submit"
-              className="w-full bg-purple-600 text-white font-bold py-3.5 rounded-2xl hover:bg-purple-500 transition-all"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3.5 rounded-2xl hover:opacity-90 transition-all text-sm shadow-lg"
             >
-              Send Answer Anonymously ✨
+              Send Answer ✨
             </button>
           </form>
         )}
