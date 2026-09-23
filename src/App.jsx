@@ -410,18 +410,27 @@ function StoryCardGenerator({ question, showToast, onBack }) {
   );
 }
 
-// ANSWER STORY CARD GENERATOR WITH FULL CUSTOMIZATION CONTROLS
+// FULLY CUSTOMIZABLE ANSWER STORY GENERATOR (RE-BUILT FOR PERFECT TEXT & SIZE CONTROLS)
 function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
   const canvasRef = useRef(null);
   const [imgUrl, setImgUrl] = useState('');
 
   // Customization States
-  const [bgGrad, setBgGrad] = useState('dark');
-  const [cardColor, setCardColor] = useState('#FFFFFF');
-  const [textColor, setTextColor] = useState('#111827');
-  const [fontSize, setFontSize] = useState(42);
+  const [bgColor, setBgColor] = useState('#1E1B4B');
+  
+  // Question Box Customization
+  const [qBoxColor, setQBoxColor] = useState('rgba(255, 255, 255, 0.12)');
+  const [qTextColor, setQTextColor] = useState('#FFFFFF');
+  const [qFontSize, setQFontSize] = useState(34);
+  const [qBoxHeight, setQBoxHeight] = useState(300);
 
-  const renderWrappedText = (ctx, text, startX, startY, maxWidth, lineHeight, fSize, tColor) => {
+  // Answer Box Customization
+  const [aBoxColor, setABoxColor] = useState('#FFFFFF');
+  const [aTextColor, setATextColor] = useState('#111827');
+  const [aFontSize, setAFontSize] = useState(40);
+  const [aBoxHeight, setABoxHeight] = useState(650);
+
+  const drawWrappedText = (ctx, text, startX, startY, maxWidth, lineHeight, fSize, tColor) => {
     ctx.fillStyle = tColor;
     ctx.font = `bold ${fSize}px Inter, sans-serif`;
     const words = text.split(' ');
@@ -447,53 +456,64 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
     canvas.width = 1080; canvas.height = 1920;
 
     const drawAnswerCard = (aImg = null) => {
-      // 1. Background Gradient
-      const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
-      if (bgGrad === 'dark') {
-        gradient.addColorStop(0, '#1E1B4B');
-        gradient.addColorStop(1, '#0F172A');
-      } else if (bgGrad === 'pink') {
-        gradient.addColorStop(0, '#831843');
-        gradient.addColorStop(1, '#310413');
-      } else {
-        gradient.addColorStop(0, '#064E3B');
-        gradient.addColorStop(1, '#022C22');
-      }
-      ctx.fillStyle = gradient;
+      // 1. Background
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, 1080, 1920);
 
       // 2. QUESTION BOX (TOP)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.roundRect(100, 220, 880, 280, 36);
+      const qBoxY = 150;
+      ctx.fillStyle = qBoxColor;
+      ctx.roundRect(100, qBoxY, 880, qBoxHeight, 36);
       ctx.fill();
 
-      ctx.fillStyle = '#E9D5FF';
-      ctx.font = 'bold 26px Inter, sans-serif';
+      ctx.fillStyle = '#C084FC';
+      ctx.font = 'bold 24px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`Q: ${question.text}`, 540, 365);
+      ctx.fillText('QUESTION', 540, qBoxY + 50);
+
+      drawWrappedText(
+        ctx, 
+        `"${question.text}"`, 
+        540, 
+        qBoxY + 110, 
+        780, 
+        qFontSize + 10, 
+        qFontSize, 
+        qTextColor
+      );
 
       // 3. ANSWER BOX (BOTTOM)
-      const answerBoxY = 550;
-      const answerBoxHeight = aImg ? 1150 : 950;
+      const aBoxY = qBoxY + qBoxHeight + 50;
+      const actualABoxHeight = aImg ? aBoxHeight + 350 : aBoxHeight;
 
-      ctx.fillStyle = cardColor;
-      ctx.roundRect(100, answerBoxY, 880, answerBoxHeight, 48);
+      ctx.fillStyle = aBoxColor;
+      ctx.roundRect(100, aBoxY, 880, actualABoxHeight, 48);
       ctx.fill();
 
       ctx.fillStyle = '#DB2777';
-      ctx.font = 'bold 28px Inter, sans-serif';
-      ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, answerBoxY + 70);
+      ctx.font = 'bold 26px Inter, sans-serif';
+      ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, aBoxY + 60);
 
       if (aImg) {
-        ctx.drawImage(aImg, 180, answerBoxY + 110, 720, 480);
+        ctx.drawImage(aImg, 180, aBoxY + 100, 720, 380);
       }
 
-      const ansTextY = aImg ? answerBoxY + 640 : answerBoxY + 160;
-      renderWrappedText(ctx, `"${answer.text}"`, 540, ansTextY, 780, fontSize + 12, fontSize, textColor);
+      const ansTextY = aImg ? aBoxY + 530 : aBoxY + 140;
+      drawWrappedText(
+        ctx, 
+        `"${answer.text}"`, 
+        540, 
+        ansTextY, 
+        780, 
+        aFontSize + 10, 
+        aFontSize, 
+        aTextColor
+      );
 
       // Watermark
       ctx.fillStyle = '#9CA3AF';
       ctx.font = 'bold 26px Inter, sans-serif';
+      ctx.textAlign = 'center';
       ctx.fillText('ASKLY BY FIRST FUEL', 540, 1840);
 
       canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
@@ -508,45 +528,70 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
     } else {
       drawAnswerCard(null);
     }
-  }, [question, answer, bgGrad, cardColor, textColor, fontSize]);
+  }, [question, answer, bgColor, qBoxColor, qTextColor, qFontSize, qBoxHeight, aBoxColor, aTextColor, aFontSize, aBoxHeight]);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="max-w-6xl mx-auto px-6 py-10">
       <button onClick={onBack} className="text-xs text-gray-400 mb-6 block">← Back to Dashboard</button>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         <div className="flex flex-col items-center">
           <canvas ref={canvasRef} className="hidden" />
           {imgUrl && <img src={imgUrl} className="w-64 h-[450px] rounded-3xl object-cover shadow-2xl border border-white/10" />}
         </div>
-        <div className="space-y-6 bg-white/5 border border-white/10 p-6 rounded-3xl">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Sliders className="w-4 h-4 text-purple-400"/> Customize Answer Story</h2>
+        
+        {/* CUSTOMIZATION STUDIO PANEL */}
+        <div className="space-y-6 bg-white/5 border border-white/10 p-6 rounded-3xl text-xs max-h-[85vh] overflow-y-auto">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2"><Sliders className="w-4 h-4 text-purple-400"/> Customization Studio</h2>
           
-          <div className="space-y-4 text-xs">
-            <div>
-              <label className="text-gray-400 block mb-1">Background Theme</label>
-              <select value={bgGrad} onChange={e => setBgGrad(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-white">
-                <option value="dark">Deep Indigo / Dark</option>
-                <option value="pink">Ruby Maroon</option>
-                <option value="emerald">Emerald Green</option>
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          {/* Background */}
+          <div>
+            <label className="text-gray-400 block mb-1">Page Background Color</label>
+            <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} className="w-full h-9 rounded-xl bg-transparent cursor-pointer" />
+          </div>
+
+          {/* Question Box Controls */}
+          <div className="p-4 bg-black/30 rounded-2xl border border-white/10 space-y-3">
+            <h3 className="font-bold text-purple-300">Question Box Customization</h3>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-gray-400 block mb-1">Answer Card Color</label>
-                <input type="color" value={cardColor} onChange={e => setCardColor(e.target.value)} className="w-full h-10 rounded-xl bg-transparent cursor-pointer" />
+                <label className="text-gray-400 block mb-1">Box Height ({qBoxHeight}px)</label>
+                <input type="range" min="180" max="500" value={qBoxHeight} onChange={e => setQBoxHeight(Number(e.target.value))} className="w-full accent-purple-500" />
               </div>
               <div>
-                <label className="text-gray-400 block mb-1">Answer Text Color</label>
-                <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} className="w-full h-10 rounded-xl bg-transparent cursor-pointer" />
+                <label className="text-gray-400 block mb-1">Font Size ({qFontSize}px)</label>
+                <input type="range" min="24" max="48" value={qFontSize} onChange={e => setQFontSize(Number(e.target.value))} className="w-full accent-purple-500" />
               </div>
-            </div>
-            <div>
-              <label className="text-gray-400 block mb-1">Text Font Size ({fontSize}px)</label>
-              <input type="range" min="30" max="56" value={fontSize} onChange={e => setFontSize(Number(e.target.value))} className="w-full mt-2 accent-purple-500" />
+              <div>
+                <label className="text-gray-400 block mb-1">Text Color</label>
+                <input type="color" value={qTextColor} onChange={e => setQTextColor(e.target.value)} className="w-full h-8 rounded-lg bg-transparent cursor-pointer" />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-3 pt-4 border-t border-white/10">
+          {/* Answer Box Controls */}
+          <div className="p-4 bg-black/30 rounded-2xl border border-white/10 space-y-3">
+            <h3 className="font-bold text-pink-300">Answer Box Customization</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-gray-400 block mb-1">Box Height ({aBoxHeight}px)</label>
+                <input type="range" min="400" max="900" value={aBoxHeight} onChange={e => setABoxHeight(Number(e.target.value))} className="w-full accent-pink-500" />
+              </div>
+              <div>
+                <label className="text-gray-400 block mb-1">Font Size ({aFontSize}px)</label>
+                <input type="range" min="28" max="54" value={aFontSize} onChange={e => setAFontSize(Number(e.target.value))} className="w-full accent-pink-500" />
+              </div>
+              <div>
+                <label className="text-gray-400 block mb-1">Card Color</label>
+                <input type="color" value={aBoxColor} onChange={e => setABoxColor(e.target.value)} className="w-full h-8 rounded-lg bg-transparent cursor-pointer" />
+              </div>
+              <div>
+                <label className="text-gray-400 block mb-1">Text Color</label>
+                <input type="color" value={aTextColor} onChange={e => setATextColor(e.target.value)} className="w-full h-8 rounded-lg bg-transparent cursor-pointer" />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2">
             <a 
               href={imgUrl} 
               download={`askly-answer-${question.slug}.png`} 
