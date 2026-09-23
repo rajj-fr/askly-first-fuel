@@ -5,8 +5,7 @@ import {
   Copy, 
   Download, 
   Trash2, 
-  Instagram,
-  MessageSquare
+  Instagram
 } from 'lucide-react';
 
 // SUPABASE CONFIGURATION
@@ -278,7 +277,22 @@ function StoryCardGenerator({ question, showToast, onBack }) {
 
     ctx.fillStyle = '#590D22';
     ctx.font = 'bold 50px Inter';
-    ctx.fillText(question.text, 540, 900);
+    
+    // Wrapped Text Logic
+    const words = question.text.split(' ');
+    let line = '';
+    let y = 880;
+    for (let n = 0; n < words.length; n++) {
+      let testLine = line + words[n] + ' ';
+      if (ctx.measureText(testLine).width > 720 && n > 0) {
+        ctx.fillText(line, 540, y);
+        line = words[n] + ' ';
+        y += 65;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, 540, y);
 
     canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
   }, [question]);
@@ -300,10 +314,28 @@ function StoryCardGenerator({ question, showToast, onBack }) {
   );
 }
 
-// NEW: ANSWER RESPONSE STORY CARD GENERATOR
+// ANSWER STORY CARD GENERATOR WITH QUESTION & ANSWER TEXT WRAPPING
 function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
   const canvasRef = useRef(null);
   const [imgUrl, setImgUrl] = useState('');
+
+  // Helper to render wrapped text inside canvas
+  const renderWrappedText = (ctx, text, startX, startY, maxWidth, lineHeight) => {
+    const words = text.split(' ');
+    let line = '';
+    let currentY = startY;
+    for (let n = 0; n < words.length; n++) {
+      let testLine = line + words[n] + ' ';
+      if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+        ctx.fillText(line, startX, currentY);
+        line = words[n] + ' ';
+        currentY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, startX, currentY);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -318,36 +350,36 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // Question Box (Top)
+    // 1. QUESTION BOX (Top)
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.roundRect(120, 450, 840, 320, 36);
+    ctx.roundRect(120, 380, 840, 360, 36);
     ctx.fill();
 
     ctx.fillStyle = '#A855F7';
-    ctx.font = 'bold 30px Inter';
+    ctx.font = 'bold 30px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('QUESTION', 540, 520);
+    ctx.fillText('QUESTION', 540, 450);
 
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 40px Inter';
-    ctx.fillText(`"${question.text}"`, 540, 620);
+    ctx.font = 'bold 38px Inter, sans-serif';
+    renderWrappedText(ctx, `"${question.text}"`, 540, 530, 750, 52);
 
-    // Answer Box (Main Center)
+    // 2. ANSWER BOX (Main Center)
     ctx.fillStyle = '#FFFFFF';
-    ctx.roundRect(120, 850, 840, 520, 48);
+    ctx.roundRect(120, 800, 840, 600, 48);
     ctx.fill();
 
     ctx.fillStyle = '#EC4899';
-    ctx.font = 'bold 34px Inter';
-    ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, 930);
+    ctx.font = 'bold 32px Inter, sans-serif';
+    ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, 880);
 
     ctx.fillStyle = '#111827';
-    ctx.font = 'bold 46px Inter';
-    ctx.fillText(`"${answer.text}"`, 540, 1080);
+    ctx.font = 'bold 44px Inter, sans-serif';
+    renderWrappedText(ctx, `"${answer.text}"`, 540, 980, 750, 60);
 
     // Watermark
     ctx.fillStyle = '#9CA3AF';
-    ctx.font = 'bold 28px Inter';
+    ctx.font = 'bold 28px Inter, sans-serif';
     ctx.fillText('ASKLY BY FIRST FUEL', 540, 1800);
 
     canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
@@ -355,7 +387,7 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
-      <button onClick={onBack} className="text-xs text-gray-400 mb-6">← Back to Dashboard</button>
+      <button onClick={onBack} className="text-xs text-gray-400 mb-6 block">← Back to Dashboard</button>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
         <div className="flex flex-col items-center">
           <canvas ref={canvasRef} className="hidden" />
@@ -363,11 +395,11 @@ function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
         </div>
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-white">Share Answer to IG Story</h2>
-          <p className="text-xs text-gray-400">Download this card and post it to your Instagram Story to show everyone the answer!</p>
+          <p className="text-xs text-gray-400">Download this card featuring both the question and answer to post on your Instagram Story!</p>
           <a 
             href={imgUrl} 
             download={`askly-answer-${question.slug}.png`} 
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 rounded-2xl block text-center shadow-lg"
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 rounded-2xl block text-center shadow-lg hover:opacity-90 transition-all"
           >
             Download Answer Story Image 📸
           </a>
