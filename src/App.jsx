@@ -5,26 +5,26 @@ import {
   Copy, 
   Download, 
   Trash2, 
-  Instagram
+  Instagram,
+  MessageSquare
 } from 'lucide-react';
 
 // SUPABASE CONFIGURATION
 const SUPABASE_URL = "https://grpbhwguqledavbnvfdq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE"; // 👈 Apni anon key re-paste karein
+const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE"; // 👈 Apni anon key paste karein
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function App() {
-  // ROUTING FIX ON REFRESH: Tab state read from URL hash or fallback to 'home'
   const [activeTab, setActiveTabState] = useState(() => {
     const hash = window.location.hash.replace('#', '');
-    return ['home', 'create', 'dashboard', 'story', 'public'].includes(hash) ? hash : 'home';
+    return ['home', 'create', 'dashboard', 'story', 'answerStory', 'public'].includes(hash) ? hash : 'home';
   });
 
   const [selectedQuestion, setSelectedQuestion] = useState(null);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [questions, setQuestions] = useState([]);
 
-  // Helper to change tab & sync with browser URL Hash
   const setActiveTab = (tabName) => {
     setActiveTabState(tabName);
     if (tabName !== 'public') {
@@ -32,7 +32,6 @@ export default function App() {
     }
   };
 
-  // Fetch Questions & Answers from Supabase
   const loadData = async () => {
     const { data: qData } = await supabase.from('questions').select('*').order('created_at', { ascending: false });
     const { data: aData } = await supabase.from('answers').select('*').order('created_at', { ascending: false });
@@ -49,7 +48,6 @@ export default function App() {
   useEffect(() => {
     loadData();
 
-    // Real-time subscription for live updates
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
@@ -60,7 +58,6 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // URL Query Parameter Routing Fix for IG Story Viewers (`?q=slug`)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const qSlug = params.get('q');
@@ -139,6 +136,11 @@ export default function App() {
             questions={questions} 
             showToast={showToast}
             onOpenStory={(q) => { setSelectedQuestion(q); setActiveTab('story'); }}
+            onOpenAnswerStory={(q, a) => {
+              setSelectedQuestion(q);
+              setSelectedAnswer(a);
+              setActiveTab('answerStory');
+            }}
             onDeleteQuestion={async (slug) => {
               await supabase.from('questions').delete().eq('slug', slug);
               showToast("Deleted");
@@ -149,6 +151,15 @@ export default function App() {
 
         {activeTab === 'story' && selectedQuestion && (
           <StoryCardGenerator question={selectedQuestion} showToast={showToast} onBack={() => setActiveTab('dashboard')} />
+        )}
+
+        {activeTab === 'answerStory' && selectedQuestion && selectedAnswer && (
+          <AnswerStoryCardGenerator 
+            question={selectedQuestion} 
+            answer={selectedAnswer} 
+            showToast={showToast} 
+            onBack={() => setActiveTab('dashboard')} 
+          />
         )}
 
         {activeTab === 'public' && selectedQuestion && (
@@ -198,7 +209,7 @@ function CreateQuestionPage({ onCreated }) {
   );
 }
 
-function OwnerDashboard({ questions, showToast, onOpenStory, onDeleteQuestion }) {
+function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, onDeleteQuestion }) {
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       <h1 className="text-2xl font-black mb-6">Realtime Answers Dashboard</h1>
@@ -212,7 +223,7 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onDeleteQuestion })
                 <h3 className="font-bold text-lg">"{q.text}"</h3>
                 <div className="flex gap-2">
                   <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}?q=${q.slug}`); showToast("Link Copied!"); }} className="bg-amber-500/20 text-amber-300 px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Copy className="w-3.5 h-3.5"/> Copy Link</button>
-                  <button onClick={() => onOpenStory(q)} className="bg-purple-600 text-white px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Instagram className="w-3.5 h-3.5"/> Story Card</button>
+                  <button onClick={() => onOpenStory(q)} className="bg-purple-600 text-white px-3 py-2 rounded-xl text-xs font-bold flex gap-1"><Instagram className="w-3.5 h-3.5"/> Question Story</button>
                   <button onClick={() => onDeleteQuestion(q.slug)} className="bg-red-500/20 text-red-400 p-2 rounded-xl text-xs"><Trash2 className="w-3.5 h-3.5"/></button>
                 </div>
               </div>
@@ -220,9 +231,17 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onDeleteQuestion })
                 <span className="text-xs text-gray-400 block mb-2">Realtime Answers ({q.answers?.length || 0})</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {q.answers?.map(a => (
-                    <div key={a.id} className="bg-black/40 border border-white/10 p-3 rounded-2xl">
-                      <span className="text-xs font-bold text-pink-400 block mb-1">{a.author}</span>
-                      <p className="text-xs text-gray-200">{a.text}</p>
+                    <div key={a.id} className="bg-black/40 border border-white/10 p-3.5 rounded-2xl flex flex-col justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-pink-400 block mb-1">{a.author}</span>
+                        <p className="text-xs text-gray-200 mb-3">{a.text}</p>
+                      </div>
+                      <button 
+                        onClick={() => onOpenAnswerStory(q, a)}
+                        className="bg-purple-600/30 hover:bg-purple-600 text-purple-200 border border-purple-500/30 text-[11px] font-bold py-1.5 px-3 rounded-xl flex items-center justify-center gap-1.5 self-start transition-all"
+                      >
+                        <Instagram className="w-3 h-3 text-pink-400" /> Share Answer Story
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -275,6 +294,83 @@ function StoryCardGenerator({ question, showToast, onBack }) {
         <div className="space-y-4">
           <button onClick={() => { navigator.clipboard.writeText(currentUrl); showToast("Link Copied!"); }} className="w-full bg-amber-500 text-black font-bold py-3 rounded-2xl">1. Copy Link</button>
           <a href={imgUrl} download={`askly-${question.slug}.png`} className="w-full bg-purple-600 text-white font-bold py-3 rounded-2xl block text-center">2. Download Story Image</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// NEW: ANSWER RESPONSE STORY CARD GENERATOR
+function AnswerStoryCardGenerator({ question, answer, showToast, onBack }) {
+  const canvasRef = useRef(null);
+  const [imgUrl, setImgUrl] = useState('');
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = 1080; canvas.height = 1920;
+
+    // Background Gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
+    gradient.addColorStop(0, '#2E1065');
+    gradient.addColorStop(1, '#090514');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    // Question Box (Top)
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.roundRect(120, 450, 840, 320, 36);
+    ctx.fill();
+
+    ctx.fillStyle = '#A855F7';
+    ctx.font = 'bold 30px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText('QUESTION', 540, 520);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 40px Inter';
+    ctx.fillText(`"${question.text}"`, 540, 620);
+
+    // Answer Box (Main Center)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.roundRect(120, 850, 840, 520, 48);
+    ctx.fill();
+
+    ctx.fillStyle = '#EC4899';
+    ctx.font = 'bold 34px Inter';
+    ctx.fillText(`ANSWER FROM ${answer.author.toUpperCase()}`, 540, 930);
+
+    ctx.fillStyle = '#111827';
+    ctx.font = 'bold 46px Inter';
+    ctx.fillText(`"${answer.text}"`, 540, 1080);
+
+    // Watermark
+    ctx.fillStyle = '#9CA3AF';
+    ctx.font = 'bold 28px Inter';
+    ctx.fillText('ASKLY BY FIRST FUEL', 540, 1800);
+
+    canvas.toBlob(blob => setImgUrl(URL.createObjectURL(blob)));
+  }, [question, answer]);
+
+  return (
+    <div className="max-w-4xl mx-auto px-6 py-10">
+      <button onClick={onBack} className="text-xs text-gray-400 mb-6">← Back to Dashboard</button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div className="flex flex-col items-center">
+          <canvas ref={canvasRef} className="hidden" />
+          {imgUrl && <img src={imgUrl} className="w-64 h-[450px] rounded-3xl object-cover shadow-2xl border border-white/10" />}
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-white">Share Answer to IG Story</h2>
+          <p className="text-xs text-gray-400">Download this card and post it to your Instagram Story to show everyone the answer!</p>
+          <a 
+            href={imgUrl} 
+            download={`askly-answer-${question.slug}.png`} 
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 rounded-2xl block text-center shadow-lg"
+          >
+            Download Answer Story Image 📸
+          </a>
         </div>
       </div>
     </div>
