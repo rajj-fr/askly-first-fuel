@@ -23,19 +23,35 @@ export default function App() {
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  const [questions, setQuestions] = useState([
-    {
-      id: 'q1',
-      slug: '8xK29Lm',
-      text: "Tell me something you've never told me 👀",
-      views: 384,
-      createdAt: '2 hours ago',
-      answers: [
-        { id: 'a1', text: "You are actually really funny 😂", author: "@arjun_dev", time: "2 min ago" },
-        { id: 'a2', text: "I've had a crush on you since last year...", author: "Anonymous", time: "8 min ago" }
-      ]
+  // LOCAL STORAGE INTEGRATION (PERMANENT SAVE FIX)
+  const [questions, setQuestions] = useState(() => {
+    const saved = localStorage.getItem('askly_questions');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
     }
-  ]);
+    return [
+      {
+        id: 'q1',
+        slug: '8xK29Lm',
+        text: "Tell me something you've never told me 👀",
+        views: 384,
+        createdAt: '2 hours ago',
+        answers: [
+          { id: 'a1', text: "You are actually really funny 😂", author: "@arjun_dev", time: "2 min ago" },
+          { id: 'a2', text: "I've had a crush on you since last year...", author: "Anonymous", time: "8 min ago" }
+        ]
+      }
+    ];
+  });
+
+  // SAVE TO LOCALSTORAGE ON EVERY UPDATE
+  useEffect(() => {
+    localStorage.setItem('askly_questions', JSON.stringify(questions));
+  }, [questions]);
 
   // URL QUERY PARAMETER ROUTING FIX
   useEffect(() => {
@@ -48,7 +64,6 @@ export default function App() {
         setSelectedQuestion(foundQ);
         setActiveTab('public');
       } else {
-        // Fallback for demo/new questions generated via link
         const dynamicQ = {
           id: 'q_' + qSlug,
           slug: qSlug,
@@ -61,7 +76,7 @@ export default function App() {
         setActiveTab('public');
       }
     }
-  }, []);
+  }, [questions]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -156,7 +171,8 @@ export default function App() {
             onOpenPublic={openPublicView}
             showToast={showToast}
             onDeleteQuestion={(id) => {
-              setQuestions(questions.filter(q => q.id !== id));
+              const updated = questions.filter(q => q.id !== id);
+              setQuestions(updated);
               showToast("Question deleted");
             }}
           />
@@ -219,7 +235,7 @@ function LandingPage({ onStart, onDemo }) {
       </h1>
 
       <p className="text-gray-400 text-base sm:text-lg max-w-xl mx-auto mb-8">
-        Create beautiful question cards, download for Instagram stories, and receive direct answers!
+        Create beautiful question cards, download for Instagram stories, and receive answers!
       </p>
 
       <div className="flex flex-col sm:flex-row justify-center gap-4">
@@ -297,65 +313,71 @@ function OwnerDashboard({ questions, onOpenStory, onOpenPublic, showToast, onDel
       <h1 className="text-2xl font-black text-white mb-6">Your Questions & Answers</h1>
 
       <div className="space-y-6">
-        {questions.map((q) => {
-          return (
-            <div key={q.id} className="bg-white/5 border border-white/10 rounded-3xl p-6">
-              
-              <div className="flex flex-col sm:flex-row justify-between gap-4 pb-4 border-b border-white/10">
-                <div>
-                  <h3 className="text-lg font-bold text-white">"{q.text}"</h3>
-                  <span className="text-xs text-gray-400 mt-1 block">Slug: {q.slug}</span>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button 
-                    onClick={() => copyLink(q.slug)}
-                    className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
-                  >
-                    <Copy className="w-3.5 h-3.5" /> Copy Link
-                  </button>
-                  <button 
-                    onClick={() => onOpenStory(q)}
-                    className="bg-purple-600 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
-                  >
-                    <Instagram className="w-3.5 h-3.5" /> Story Card
-                  </button>
-                  <button 
-                    onClick={() => onDeleteQuestion(q.id)}
-                    className="bg-red-500/10 text-red-400 text-xs p-2 rounded-xl"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Answers */}
-              <div className="mt-4">
-                <span className="text-xs font-semibold text-gray-400 mb-3 block">
-                  Answers ({q.answers.length})
-                </span>
-                {q.answers.length === 0 ? (
-                  <p className="text-xs text-gray-500 italic">No answers yet. Share your link on IG Story!</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {q.answers.map((ans) => (
-                      <div key={ans.id} className="bg-black/40 border border-white/10 p-3.5 rounded-2xl">
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-xs font-bold text-pink-400 flex items-center gap-1">
-                            <Instagram className="w-3 h-3 text-pink-400" /> {ans.author}
-                          </span>
-                          <span className="text-[10px] text-gray-500">{ans.time}</span>
-                        </div>
-                        <p className="text-xs text-gray-200">{ans.text}</p>
-                      </div>
-                    ))}
+        {questions.length === 0 ? (
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-8 text-center text-gray-400">
+            No questions created yet. Click on "Create" to start!
+          </div>
+        ) : (
+          questions.map((q) => {
+            return (
+              <div key={q.id} className="bg-white/5 border border-white/10 rounded-3xl p-6">
+                
+                <div className="flex flex-col sm:flex-row justify-between gap-4 pb-4 border-b border-white/10">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">"{q.text}"</h3>
+                    <span className="text-xs text-gray-400 mt-1 block">Slug: {q.slug}</span>
                   </div>
-                )}
-              </div>
 
-            </div>
-          );
-        })}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button 
+                      onClick={() => copyLink(q.slug)}
+                      className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copy Link
+                    </button>
+                    <button 
+                      onClick={() => onOpenStory(q)}
+                      className="bg-purple-600 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
+                    >
+                      <Instagram className="w-3.5 h-3.5" /> Story Card
+                    </button>
+                    <button 
+                      onClick={() => onDeleteQuestion(q.id)}
+                      className="bg-red-500/10 text-red-400 text-xs p-2 rounded-xl"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Answers */}
+                <div className="mt-4">
+                  <span className="text-xs font-semibold text-gray-400 mb-3 block">
+                    Answers ({q.answers.length})
+                  </span>
+                  {q.answers.length === 0 ? (
+                    <p className="text-xs text-gray-500 italic">No answers yet. Share your link on IG Story!</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {q.answers.map((ans) => (
+                        <div key={ans.id} className="bg-black/40 border border-white/10 p-3.5 rounded-2xl">
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="text-xs font-bold text-pink-400 flex items-center gap-1">
+                              <Instagram className="w-3 h-3 text-pink-400" /> {ans.author}
+                            </span>
+                            <span className="text-[10px] text-gray-500">{ans.time}</span>
+                          </div>
+                          <p className="text-xs text-gray-200">{ans.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -581,7 +603,6 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Instagram Handle Input */}
             <div className="relative">
               <Instagram className="w-4 h-4 text-pink-400 absolute left-4 top-3.5" />
               <input 
@@ -593,7 +614,6 @@ function PublicQuestionPage({ question, showToast, onAnswerSubmit, onCreateOwn }
               />
             </div>
 
-            {/* Answer Text Area */}
             <textarea 
               value={answerText}
               onChange={(e) => setAnswerText(e.target.value)}
