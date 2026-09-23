@@ -250,7 +250,7 @@ function LandingPage({ onStart }) {
   );
 }
 
-// STABLE VOICE RECORDER COMPONENT
+// UNIVERSAL VOICE RECORDER COMPONENT WITH PREVIEW PLAYER
 function VoiceRecorder({ onAudioReady }) {
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -276,7 +276,8 @@ function VoiceRecorder({ onAudioReady }) {
       mediaRecorder.onstop = async () => {
         const rawBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const processedBlob = await applyAudioEffect(rawBlob, effect);
-        setAudioUrl(URL.createObjectURL(processedBlob));
+        const previewUrl = URL.createObjectURL(processedBlob);
+        setAudioUrl(previewUrl);
         onAudioReady(processedBlob);
       };
 
@@ -291,7 +292,6 @@ function VoiceRecorder({ onAudioReady }) {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
       setRecording(false);
-      // Stop all mic tracks
       mediaRecorderRef.current.stream?.getTracks().forEach(track => track.stop());
     }
   };
@@ -342,7 +342,7 @@ function VoiceRecorder({ onAudioReady }) {
             <Square className="w-3.5 h-3.5" /> Stop 🔴
           </button>
         )}
-        {audioUrl && <audio controls src={audioUrl} className="h-8 w-full max-w-[180px]" onError={(e) => console.error("Audio playback error", e)} />}
+        {audioUrl && <audio controls src={audioUrl} className="h-8 w-full max-w-[180px]" />}
       </div>
     </div>
   );
@@ -416,7 +416,7 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
                         {a.image_url && <a href={a.image_url} target="_blank" rel="noreferrer" className="text-[11px] text-pink-400 underline flex items-center gap-1 mb-3"><ImageIcon className="w-3 h-3"/> Photo</a>}
                       </div>
                       <button onClick={() => onOpenAnswerStory(q, a)} className="bg-purple-600/30 hover:bg-purple-600 text-purple-200 border border-purple-500/30 text-[11px] font-bold py-1.5 px-3 rounded-xl flex items-center justify-center gap-1.5 self-start">
-                        <Instagram className="w-3.5 h-3.5 text-pink-400" /> Share Story
+                        <Instagram className="w-3 h-3 text-pink-400" /> Share Story
                       </button>
                     </div>
                   ))}
