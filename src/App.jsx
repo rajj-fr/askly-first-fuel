@@ -250,7 +250,7 @@ function LandingPage({ onStart }) {
   );
 }
 
-// UNIVERSAL VOICE RECORDER COMPONENT WITH PREVIEW PLAYER
+// ROBUST VOICE RECORDER WITH BLOB HANDLING
 function VoiceRecorder({ onAudioReady }) {
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -262,11 +262,7 @@ function VoiceRecorder({ onAudioReady }) {
     audioChunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : 'audio/webm';
-      
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -274,10 +270,12 @@ function VoiceRecorder({ onAudioReady }) {
       };
 
       mediaRecorder.onstop = async () => {
-        const rawBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const processedBlob = await applyAudioEffect(rawBlob, effect);
-        const previewUrl = URL.createObjectURL(processedBlob);
-        setAudioUrl(previewUrl);
+        
+        // Create an object URL specifically for HTML5 audio playback
+        const playableUrl = URL.createObjectURL(processedBlob);
+        setAudioUrl(playableUrl);
         onAudioReady(processedBlob);
       };
 
@@ -342,7 +340,14 @@ function VoiceRecorder({ onAudioReady }) {
             <Square className="w-3.5 h-3.5" /> Stop 🔴
           </button>
         )}
-        {audioUrl && <audio controls src={audioUrl} className="h-8 w-full max-w-[180px]" />}
+        {audioUrl && (
+          <audio 
+            controls 
+            src={audioUrl} 
+            className="h-8 w-full max-w-[180px]" 
+            onError={() => alert("Audio playback failed. Please try re-recording.")} 
+          />
+        )}
       </div>
     </div>
   );
@@ -395,7 +400,14 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
               <div className="flex justify-between items-center pb-4 border-b border-white/10">
                 <div>
                   <h3 className="font-bold text-lg">"{q.text || "🎙️ Voice Question"}"</h3>
-                  {q.audio_url && <audio controls src={q.audio_url} className="h-8 mt-2 max-w-[240px]" />}
+                  {q.audio_url && (
+                    <audio 
+                      controls 
+                      src={q.audio_url} 
+                      className="h-8 mt-2 max-w-[240px]" 
+                      onError={(e) => console.error("Cloud audio load error:", e)} 
+                    />
+                  )}
                   {q.image_url && <a href={q.image_url} target="_blank" rel="noreferrer" className="text-xs text-purple-400 underline flex items-center gap-1 mt-1"><ImageIcon className="w-3 h-3"/> Attached Image</a>}
                 </div>
                 <div className="flex gap-2">
@@ -412,7 +424,14 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
                       <div>
                         <span className="text-xs font-bold text-pink-400 block mb-1">{a.author}</span>
                         <p className="text-xs text-gray-200 mb-2">{a.text || "🎙️ Voice Answer"}</p>
-                        {a.audio_url && <audio controls src={a.audio_url} className="h-7 my-2 w-full" />}
+                        {a.audio_url && (
+                          <audio 
+                            controls 
+                            src={a.audio_url} 
+                            className="h-7 my-2 w-full" 
+                            onError={(e) => console.error("Cloud audio load error:", e)} 
+                          />
+                        )}
                         {a.image_url && <a href={a.image_url} target="_blank" rel="noreferrer" className="text-[11px] text-pink-400 underline flex items-center gap-1 mb-3"><ImageIcon className="w-3 h-3"/> Photo</a>}
                       </div>
                       <button onClick={() => onOpenAnswerStory(q, a)} className="bg-purple-600/30 hover:bg-purple-600 text-purple-200 border border-purple-500/30 text-[11px] font-bold py-1.5 px-3 rounded-xl flex items-center justify-center gap-1.5 self-start">
