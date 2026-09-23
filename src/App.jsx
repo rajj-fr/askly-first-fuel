@@ -136,7 +136,10 @@ export default function App() {
 
               if (audioBlob) {
                 const audioName = `q_audio_${Date.now()}.webm`;
-                const { data: uploadAudioData } = await supabase.storage.from('askly-media').upload(audioName, audioBlob);
+                const { data: uploadAudioData } = await supabase.storage.from('askly-media').upload(audioName, audioBlob, {
+                  contentType: 'audio/webm',
+                  upsert: true
+                });
                 if (uploadAudioData) {
                   const { data: publicAudioUrl } = supabase.storage.from('askly-media').getPublicUrl(audioName);
                   audioUrl = publicAudioUrl.publicUrl;
@@ -207,7 +210,10 @@ export default function App() {
 
               if (audioBlob) {
                 const audioName = `a_audio_${Date.now()}.webm`;
-                const { data: uploadAudioData } = await supabase.storage.from('askly-media').upload(audioName, audioBlob);
+                const { data: uploadAudioData } = await supabase.storage.from('askly-media').upload(audioName, audioBlob, {
+                  contentType: 'audio/webm',
+                  upsert: true
+                });
                 if (uploadAudioData) {
                   const { data: publicAudioUrl } = supabase.storage.from('askly-media').getPublicUrl(audioName);
                   audioUrl = publicAudioUrl.publicUrl;
@@ -244,10 +250,9 @@ function LandingPage({ onStart }) {
   );
 }
 
-// VOICE RECORDER COMPONENT WITH EFFECTS
+// STABLE VOICE RECORDER COMPONENT
 function VoiceRecorder({ onAudioReady }) {
   const [recording, setRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [effect, setEffect] = useState('normal');
   const mediaRecorderRef = useRef(null);
@@ -257,7 +262,11 @@ function VoiceRecorder({ onAudioReady }) {
     audioChunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+        ? 'audio/webm;codecs=opus' 
+        : 'audio/webm';
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -265,9 +274,8 @@ function VoiceRecorder({ onAudioReady }) {
       };
 
       mediaRecorder.onstop = async () => {
-        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const rawBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const processedBlob = await applyAudioEffect(rawBlob, effect);
-        setAudioBlob(processedBlob);
         setAudioUrl(URL.createObjectURL(processedBlob));
         onAudioReady(processedBlob);
       };
@@ -275,7 +283,7 @@ function VoiceRecorder({ onAudioReady }) {
       mediaRecorder.start();
       setRecording(true);
     } catch (err) {
-      alert("Microphone access permission required.");
+      alert("Microphone permission denied or not supported.");
     }
   };
 
@@ -283,6 +291,8 @@ function VoiceRecorder({ onAudioReady }) {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
       setRecording(false);
+      // Stop all mic tracks
+      mediaRecorderRef.current.stream?.getTracks().forEach(track => track.stop());
     }
   };
 
@@ -332,7 +342,7 @@ function VoiceRecorder({ onAudioReady }) {
             <Square className="w-3.5 h-3.5" /> Stop 🔴
           </button>
         )}
-        {audioUrl && <audio controls src={audioUrl} className="h-8 w-full max-w-[180px]" />}
+        {audioUrl && <audio controls src={audioUrl} className="h-8 w-full max-w-[180px]" onError={(e) => console.error("Audio playback error", e)} />}
       </div>
     </div>
   );
@@ -406,7 +416,7 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
                         {a.image_url && <a href={a.image_url} target="_blank" rel="noreferrer" className="text-[11px] text-pink-400 underline flex items-center gap-1 mb-3"><ImageIcon className="w-3 h-3"/> Photo</a>}
                       </div>
                       <button onClick={() => onOpenAnswerStory(q, a)} className="bg-purple-600/30 hover:bg-purple-600 text-purple-200 border border-purple-500/30 text-[11px] font-bold py-1.5 px-3 rounded-xl flex items-center justify-center gap-1.5 self-start">
-                        <Instagram className="w-3 h-3 text-pink-400" /> Share Story
+                        <Instagram className="w-3.5 h-3.5 text-pink-400" /> Share Story
                       </button>
                     </div>
                   ))}
