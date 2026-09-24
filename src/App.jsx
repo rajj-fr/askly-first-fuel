@@ -13,10 +13,10 @@ import {
 
 // SUPABASE CONFIGURATION
 const SUPABASE_URL = "https://grpbhwguqledavbnvfdq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE"; // 👈 Apni anon key paste karein
+const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE"; // 👈 Apni anon key yahan paste karein
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Helper to get or create unique owner token for this browser
+// Helper to get or create unique owner token for this browser session
 const getOwnerToken = () => {
   let token = localStorage.getItem('askly_owner_token');
   if (!token) {
@@ -46,7 +46,6 @@ export default function App() {
   };
 
   const loadData = async () => {
-    // Fetch only questions belonging to this specific browser's owner token
     const { data: qData } = await supabase
       .from('questions')
       .select('*')
