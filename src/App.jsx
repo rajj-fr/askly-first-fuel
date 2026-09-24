@@ -16,6 +16,16 @@ const SUPABASE_URL = "https://grpbhwguqledavbnvfdq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE"; // 👈 Apni anon key paste karein
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Helper to get or create unique owner token for this browser
+const getOwnerToken = () => {
+  let token = localStorage.getItem('askly_owner_token');
+  if (!token) {
+    token = 'owner_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('askly_owner_token', token);
+  }
+  return token;
+};
+
 export default function App() {
   const [activeTab, setActiveTabState] = useState(() => {
     const hash = window.location.hash.replace('#', '');
@@ -26,6 +36,7 @@ export default function App() {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [questions, setQuestions] = useState([]);
+  const ownerToken = getOwnerToken();
 
   const setActiveTab = (tabName) => {
     setActiveTabState(tabName);
@@ -35,7 +46,13 @@ export default function App() {
   };
 
   const loadData = async () => {
-    const { data: qData } = await supabase.from('questions').select('*').order('created_at', { ascending: false });
+    // Fetch only questions belonging to this specific browser's owner token
+    const { data: qData } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('owner_token', ownerToken)
+      .order('created_at', { ascending: false });
+
     const { data: aData } = await supabase.from('answers').select('*').order('created_at', { ascending: false });
 
     if (qData) {
@@ -147,7 +164,14 @@ export default function App() {
               }
 
               const slug = Math.random().toString(36).substring(2, 8);
-              const { data } = await supabase.from('questions').insert([{ slug, text: qText, image_url: imageUrl, audio_url: audioUrl }]).select().single();
+              const { data } = await supabase.from('questions').insert([{ 
+                slug, 
+                text: qText, 
+                image_url: imageUrl, 
+                audio_url: audioUrl,
+                owner_token: ownerToken 
+              }]).select().single();
+              
               if (data) {
                 showToast("Question Live! 🎉");
                 setSelectedQuestion(data);
@@ -250,7 +274,6 @@ function LandingPage({ onStart }) {
   );
 }
 
-// ROBUST VOICE RECORDER WITH BLOB HANDLING
 function VoiceRecorder({ onAudioReady }) {
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -272,8 +295,6 @@ function VoiceRecorder({ onAudioReady }) {
       mediaRecorder.onstop = async () => {
         const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const processedBlob = await applyAudioEffect(rawBlob, effect);
-        
-        // Create an object URL specifically for HTML5 audio playback
         const playableUrl = URL.createObjectURL(processedBlob);
         setAudioUrl(playableUrl);
         onAudioReady(processedBlob);
@@ -340,14 +361,7 @@ function VoiceRecorder({ onAudioReady }) {
             <Square className="w-3.5 h-3.5" /> Stop 🔴
           </button>
         )}
-        {audioUrl && (
-          <audio 
-            controls 
-            src={audioUrl} 
-            className="h-8 w-full max-w-[180px]" 
-            onError={() => alert("Audio playback failed. Please try re-recording.")} 
-          />
-        )}
+        {audioUrl && <audio controls src={audioUrl} className="h-8 w-full max-w-[180px]" />}
       </div>
     </div>
   );
@@ -393,21 +407,14 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
       <h1 className="text-2xl font-black mb-6">Realtime Answers Dashboard</h1>
       <div className="space-y-6">
         {questions.length === 0 ? (
-          <p className="text-gray-400 text-center py-8">No questions created yet.</p>
+          <p className="text-gray-400 text-center py-8">No questions created from this device yet.</p>
         ) : (
           questions.map(q => (
             <div key={q.id} className="bg-white/5 border border-white/10 p-6 rounded-3xl">
               <div className="flex justify-between items-center pb-4 border-b border-white/10">
                 <div>
                   <h3 className="font-bold text-lg">"{q.text || "🎙️ Voice Question"}"</h3>
-                  {q.audio_url && (
-                    <audio 
-                      controls 
-                      src={q.audio_url} 
-                      className="h-8 mt-2 max-w-[240px]" 
-                      onError={(e) => console.error("Cloud audio load error:", e)} 
-                    />
-                  )}
+                  {q.audio_url && <audio controls src={q.audio_url} className="h-8 mt-2 max-w-[240px]" />}
                   {q.image_url && <a href={q.image_url} target="_blank" rel="noreferrer" className="text-xs text-purple-400 underline flex items-center gap-1 mt-1"><ImageIcon className="w-3 h-3"/> Attached Image</a>}
                 </div>
                 <div className="flex gap-2">
@@ -424,14 +431,7 @@ function OwnerDashboard({ questions, showToast, onOpenStory, onOpenAnswerStory, 
                       <div>
                         <span className="text-xs font-bold text-pink-400 block mb-1">{a.author}</span>
                         <p className="text-xs text-gray-200 mb-2">{a.text || "🎙️ Voice Answer"}</p>
-                        {a.audio_url && (
-                          <audio 
-                            controls 
-                            src={a.audio_url} 
-                            className="h-7 my-2 w-full" 
-                            onError={(e) => console.error("Cloud audio load error:", e)} 
-                          />
-                        )}
+                        {a.audio_url && <audio controls src={a.audio_url} className="h-7 my-2 w-full" />}
                         {a.image_url && <a href={a.image_url} target="_blank" rel="noreferrer" className="text-[11px] text-pink-400 underline flex items-center gap-1 mb-3"><ImageIcon className="w-3 h-3"/> Photo</a>}
                       </div>
                       <button onClick={() => onOpenAnswerStory(q, a)} className="bg-purple-600/30 hover:bg-purple-600 text-purple-200 border border-purple-500/30 text-[11px] font-bold py-1.5 px-3 rounded-xl flex items-center justify-center gap-1.5 self-start">
