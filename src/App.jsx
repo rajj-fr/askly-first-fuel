@@ -13,10 +13,9 @@ import {
 
 // SUPABASE CONFIGURATION
 const SUPABASE_URL = "https://grpbhwguqledavbnvfdq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE"; // 👈 Apni anon key yahan paste karein
+const SUPABASE_ANON_KEY = "sb_publishable_fho8BxaObbSxFlm5VFmJGg_Aagd7zzE"; // 👈 Apni asli anon key yahan daalein
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Helper to get or create unique owner token for this browser session
 const getOwnerToken = () => {
   let token = localStorage.getItem('askly_owner_token');
   if (!token) {
@@ -46,20 +45,24 @@ export default function App() {
   };
 
   const loadData = async () => {
-    const { data: qData } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('owner_token', ownerToken)
-      .order('created_at', { ascending: false });
+    try {
+      const { data: qData } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('owner_token', ownerToken)
+        .order('created_at', { ascending: false });
 
-    const { data: aData } = await supabase.from('answers').select('*').order('created_at', { ascending: false });
+      const { data: aData } = await supabase.from('answers').select('*').order('created_at', { ascending: false });
 
-    if (qData) {
-      const combined = qData.map(q => ({
-        ...q,
-        answers: aData ? aData.filter(a => a.question_slug === q.slug) : []
-      }));
-      setQuestions(combined);
+      if (qData) {
+        const combined = qData.map(q => ({
+          ...q,
+          answers: aData ? aData.filter(a => a.question_slug === q.slug) : []
+        }));
+        setQuestions(combined);
+      }
+    } catch (err) {
+      console.error("Load data error:", err);
     }
   };
 
@@ -137,45 +140,54 @@ export default function App() {
           <CreateQuestionPage 
             showToast={showToast}
             onCreated={async (qText, file, audioBlob) => {
-              let imageUrl = null;
-              let audioUrl = null;
+              try {
+                let imageUrl = null;
+                let audioUrl = null;
 
-              if (file) {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `q_img_${Date.now()}.${fileExt}`;
-                const { data: uploadData } = await supabase.storage.from('askly-media').upload(fileName, file);
-                if (uploadData) {
-                  const { data: publicUrlData } = supabase.storage.from('askly-media').getPublicUrl(fileName);
-                  imageUrl = publicUrlData.publicUrl;
+                if (file) {
+                  const fileExt = file.name.split('.').pop();
+                  const fileName = `q_img_${Date.now()}.${fileExt}`;
+                  const { data: uploadData } = await supabase.storage.from('askly-media').upload(fileName, file);
+                  if (uploadData) {
+                    const { data: publicUrlData } = supabase.storage.from('askly-media').getPublicUrl(fileName);
+                    imageUrl = publicUrlData.publicUrl;
+                  }
                 }
-              }
 
-              if (audioBlob) {
-                const audioName = `q_audio_${Date.now()}.webm`;
-                const { data: uploadAudioData } = await supabase.storage.from('askly-media').upload(audioName, audioBlob, {
-                  contentType: 'audio/webm',
-                  upsert: true
-                });
-                if (uploadAudioData) {
-                  const { data: publicAudioUrl } = supabase.storage.from('askly-media').getPublicUrl(audioName);
-                  audioUrl = publicAudioUrl.publicUrl;
+                if (audioBlob) {
+                  const audioName = `q_audio_${Date.now()}.webm`;
+                  const { data: uploadAudioData } = await supabase.storage.from('askly-media').upload(audioName, audioBlob, {
+                    contentType: 'audio/webm',
+                    upsert: true
+                  });
+                  if (uploadAudioData) {
+                    const { data: publicAudioUrl } = supabase.storage.from('askly-media').getPublicUrl(audioName);
+                    audioUrl = publicAudioUrl.publicUrl;
+                  }
                 }
-              }
 
-              const slug = Math.random().toString(36).substring(2, 8);
-              const { data } = await supabase.from('questions').insert([{ 
-                slug, 
-                text: qText, 
-                image_url: imageUrl, 
-                audio_url: audioUrl,
-                owner_token: ownerToken 
-              }]).select().single();
-              
-              if (data) {
-                showToast("Question Live! 🎉");
-                setSelectedQuestion(data);
-                setActiveTab('story');
-                loadData();
+                const slug = Math.random().toString(36).substring(2, 8);
+                const { data, error } = await supabase.from('questions').insert([{ 
+                  slug, 
+                  text: qText, 
+                  image_url: imageUrl, 
+                  audio_url: audioUrl,
+                  owner_token: ownerToken 
+                }]).select().single();
+                
+                if (error) {
+                  alert("Supabase Error: " + error.message);
+                  return;
+                }
+
+                if (data) {
+                  showToast("Question Live! 🎉");
+                  setSelectedQuestion(data);
+                  setActiveTab('story');
+                  loadData();
+                }
+              } catch (err) {
+                alert("Error: " + err.message);
               }
             }} 
           />
@@ -373,12 +385,17 @@ function CreateQuestionPage({ onCreated, showToast }) {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    alert("Button Clicked!"); // Debug alert taaki pata chale click hua ya nahi
     if(!text.trim() && !audioBlob) {
       showToast("Please type text or record voice note!");
       return;
     }
     setLoading(true);
-    await onCreated(text, file, audioBlob);
+    try {
+      await onCreated(text, file, audioBlob);
+    } catch (e) {
+      alert("Submit Error: " + e.message);
+    }
     setLoading(false);
   };
 
@@ -392,7 +409,7 @@ function CreateQuestionPage({ onCreated, showToast }) {
           <label className="text-xs font-semibold text-gray-400 block mb-2">Attach Image (Optional)</label>
           <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} className="text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600/20 file:text-purple-300" />
         </div>
-        <button disabled={loading} onClick={handleSubmit} className="w-full bg-purple-600 font-bold py-4 rounded-2xl">
+        <button type="button" disabled={loading} onClick={handleSubmit} className="w-full bg-purple-600 font-bold py-4 rounded-2xl cursor-pointer">
           {loading ? "Publishing..." : "Generate Link →"}
         </button>
       </div>
